@@ -67,68 +67,76 @@ export function CSVUpload({ onFileUpload, loading, disabled }: CSVUploadProps) {
         <label
           htmlFor="csv-upload"
           className={`
-            flex flex-col items-center justify-center
-            w-full h-64 border-2 border-dashed rounded-xl
+            relative flex flex-col items-center justify-center
+            w-full h-80 border-2 border-dashed rounded-2xl
             cursor-pointer transition-all duration-200
+            bg-white shadow-lg hover:shadow-xl
             ${
               dragActive
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-                : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600"
+                ? "border-indigo-500 bg-indigo-50 scale-[1.02]"
+                : "border-slate-300 hover:border-indigo-400 hover:bg-slate-50"
             }
             ${disabled ? "opacity-50 cursor-not-allowed" : ""}
           `}
         >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+          <div className="flex flex-col items-center justify-center py-8 px-6">
             {loading ? (
               <>
-                <svg
-                  className="w-12 h-12 mb-4 text-blue-500 animate-spin"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-semibold">Analyzing...</span>
+                <div className="relative w-20 h-20 mb-6">
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-100"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
+                </div>
+                <p className="mb-2 text-base font-semibold text-slate-700">
+                  Analyzing your file...
+                </p>
+                <p className="text-sm text-slate-500">
+                  This usually takes a few seconds
                 </p>
               </>
             ) : (
               <>
-                <svg
-                  className="w-12 h-12 mb-4 text-slate-400 dark:text-slate-600"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 20 16"
-                >
-                  <path
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
-                  />
-                </svg>
-                <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-semibold">Click to upload</span> or drag
-                  and drop
+                <div className="relative mb-6">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <svg
+                      className="w-10 h-10 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                  </div>
+                  {dragActive && (
+                    <div className="absolute -inset-4 bg-indigo-400/20 rounded-3xl animate-pulse"></div>
+                  )}
+                </div>
+                <p className="mb-2 text-base font-semibold text-slate-700">
+                  {dragActive ? "Drop your file here" : "Drag and drop your CSV file"}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-500">
-                  CSV files only
+                <p className="mb-4 text-sm text-slate-500">
+                  or click to browse
                 </p>
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-lg">
+                  <svg
+                    className="w-4 h-4 text-slate-600"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-xs font-medium text-slate-600">
+                    CSV files only • Max 10MB
+                  </span>
+                </div>
               </>
             )}
           </div>
