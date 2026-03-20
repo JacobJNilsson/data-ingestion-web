@@ -4,17 +4,19 @@ import { useState } from "react";
 import { CSVUpload } from "@/components/CSVUpload";
 import { ContractDisplay } from "@/components/ContractDisplay";
 import { PostgresForm } from "@/components/PostgresForm";
+import { SupabaseForm } from "@/components/SupabaseForm";
 import { DatabaseDisplay } from "@/components/DatabaseDisplay";
 import type { SourceContract, DatabaseContract } from "@/types/contract";
 
 const API_BASE = "https://ingest-api-handsala-d4d73ec6.koyeb.app";
 
-type Tab = "source" | "destination";
+type Tab = "source" | "destination" | "supabase";
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("source");
   const [sourceContract, setSourceContract] = useState<SourceContract | null>(null);
   const [dbContract, setDbContract] = useState<DatabaseContract | null>(null);
+  const [supaContract, setSupaContract] = useState<DatabaseContract | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +71,31 @@ export default function Home() {
     }
   };
 
+  const handleSupabaseAnalyze = async (projectURL: string, apiKey: string) => {
+    setLoading(true);
+    setError(null);
+    setSupaContract(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/analyze-supabase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_url: projectURL, api_key: apiKey }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || `API error: ${response.status}`);
+      }
+
+      setSupaContract(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze Supabase project");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen" style={{ background: "oklch(98% 0.005 80)" }}>
       <header className="border-b" style={{ borderColor: "oklch(90% 0.005 80)" }}>
@@ -113,6 +140,12 @@ export default function Home() {
           >
             Destination (PostgreSQL)
           </TabButton>
+          <TabButton
+            active={tab === "supabase"}
+            onClick={() => { setTab("supabase"); setError(null); }}
+          >
+            Supabase
+          </TabButton>
         </div>
 
         {/* Tab content */}
@@ -133,6 +166,17 @@ export default function Home() {
             {dbContract && (
               <div className="mt-12">
                 <DatabaseDisplay contract={dbContract} />
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "supabase" && (
+          <>
+            <SupabaseForm onSubmit={handleSupabaseAnalyze} loading={loading} disabled={loading} />
+            {supaContract && (
+              <div className="mt-12">
+                <DatabaseDisplay contract={supaContract} />
               </div>
             )}
           </>
