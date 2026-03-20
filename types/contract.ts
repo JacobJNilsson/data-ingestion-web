@@ -1,3 +1,5 @@
+// Source contract types (CSV analysis)
+
 export interface TopValue {
   value: string;
   count: number;
@@ -28,4 +30,40 @@ export interface SourceContract {
   fields: Field[];
   sample_data: string[][];
   issues: string[] | null;
+}
+
+// Destination contract types (PostgreSQL database analysis)
+
+export interface FieldConstraint {
+  type: "not_null" | "unique" | "primary_key" | "foreign_key" | "check";
+  value?: unknown;
+  referred_table?: string;
+  referred_column?: string;
+}
+
+export interface DestinationField {
+  name: string;
+  data_type: string;
+  nullable: boolean;
+  description?: string;
+  constraints?: FieldConstraint[];
+}
+
+export interface ValidationRules {
+  required_fields?: string[];
+  unique_constraints?: string[];
+}
+
+export interface TableContract {
+  table_name: string;
+  schema: string;
+  fields: DestinationField[];
+  validation_rules: ValidationRules;
+}
+
+export interface DatabaseContract {
+  contract_type: string;
+  database_id: string;
+  tables: TableContract[];
+  metadata?: Record<string, unknown>;
 }
