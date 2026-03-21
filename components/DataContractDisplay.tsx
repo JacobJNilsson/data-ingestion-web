@@ -150,7 +150,6 @@ function SchemaRow({
               <tr>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Field</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Type</th>
-                <th className="text-center px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Nullable</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Constraints</th>
               </tr>
             </thead>
@@ -170,11 +169,6 @@ function SchemaRow({
                     </div>
                   </td>
                   <td className="px-5 py-3"><TypeBadge type={field.data_type} /></td>
-                  <td className="px-5 py-3 text-center">
-                    <span className="text-xs font-medium" style={{ color: field.nullable ? "oklch(55% 0.01 80)" : "oklch(40% 0.08 20)" }}>
-                      {field.nullable ? "yes" : "no"}
-                    </span>
-                  </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
                       {field.constraints?.map((c, i) => (<ConstraintBadge key={i} constraint={c} />))}
