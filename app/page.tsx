@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CSVUpload } from "@/components/CSVUpload";
+import { FileUpload } from "@/components/FileUpload";
 import { ContractDisplay } from "@/components/ContractDisplay";
 import { PostgresForm } from "@/components/PostgresForm";
 import { SupabaseForm } from "@/components/SupabaseForm";
@@ -10,11 +11,12 @@ import type { SourceContract, DatabaseContract } from "@/types/contract";
 
 const API_BASE = "https://ingest-api-handsala-d4d73ec6.koyeb.app";
 
-type Tab = "source" | "destination" | "supabase";
+type Tab = "csv" | "json" | "destination" | "supabase";
 
 export default function Home() {
-  const [tab, setTab] = useState<Tab>("source");
+  const [tab, setTab] = useState<Tab>("csv");
   const [sourceContract, setSourceContract] = useState<SourceContract | null>(null);
+  const [jsonContract, setJsonContract] = useState<SourceContract | null>(null);
   const [dbContract, setDbContract] = useState<DatabaseContract | null>(null);
   const [supaContract, setSupaContract] = useState<DatabaseContract | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +43,33 @@ export default function Home() {
       setSourceContract(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to analyze CSV");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJSONUpload = async (file: File) => {
+    setLoading(true);
+    setError(null);
+    setJsonContract(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`${API_BASE}/api/v1/analyze-json`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || `API error: ${response.status}`);
+      }
+
+      setJsonContract(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze JSON");
     } finally {
       setLoading(false);
     }
@@ -109,7 +138,7 @@ export default function Home() {
                 Data Contract Analyzer
               </h1>
               <p className="mt-1 text-sm" style={{ color: "oklch(45% 0.01 80)" }}>
-                Analyze CSV files and PostgreSQL databases
+                Analyze CSV, JSON, and PostgreSQL databases
               </p>
             </div>
             <a
@@ -129,10 +158,16 @@ export default function Home() {
         {/* Tabs */}
         <div className="flex gap-1 mb-8 border-b" style={{ borderColor: "oklch(90% 0.005 80)" }}>
           <TabButton
-            active={tab === "source"}
-            onClick={() => { setTab("source"); setError(null); }}
+            active={tab === "csv"}
+            onClick={() => { setTab("csv"); setError(null); }}
           >
-            Source (CSV)
+            CSV
+          </TabButton>
+          <TabButton
+            active={tab === "json"}
+            onClick={() => { setTab("json"); setError(null); }}
+          >
+            JSON
           </TabButton>
           <TabButton
             active={tab === "destination"}
@@ -149,12 +184,31 @@ export default function Home() {
         </div>
 
         {/* Tab content */}
-        {tab === "source" && (
+        {tab === "csv" && (
           <>
             <CSVUpload onFileUpload={handleFileUpload} loading={loading} disabled={loading} />
             {sourceContract && (
               <div className="mt-12">
                 <ContractDisplay contract={sourceContract} />
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "json" && (
+          <>
+            <FileUpload
+              onFileUpload={handleJSONUpload}
+              loading={loading}
+              disabled={loading}
+              accept=".json,.ndjson,.jsonl,application/json"
+              label="Upload JSON or NDJSON"
+              hint=".json / .ndjson / .jsonl files"
+              id="json-upload"
+            />
+            {jsonContract && (
+              <div className="mt-12">
+                <ContractDisplay contract={jsonContract} />
               </div>
             )}
           </>
