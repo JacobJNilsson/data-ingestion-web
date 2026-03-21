@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DataContract, SchemaContract, FieldConstraint } from "@/types/contract";
+import { RawJSON } from "@/components/RawJSON";
 
 interface DataContractDisplayProps {
   contract: DataContract;
@@ -57,6 +58,8 @@ export function DataContractDisplay({ contract }: DataContractDisplayProps) {
           ))}
         </div>
       </section>
+
+      <RawJSON data={contract} />
     </div>
   );
 }
