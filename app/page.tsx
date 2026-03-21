@@ -6,17 +6,19 @@ import { FileUpload } from "@/components/FileUpload";
 import { ContractDisplay } from "@/components/ContractDisplay";
 import { PostgresForm } from "@/components/PostgresForm";
 import { SupabaseForm } from "@/components/SupabaseForm";
+import { APISpecForm } from "@/components/APISpecForm";
 import { DataContractDisplay } from "@/components/DataContractDisplay";
 import type { SourceContract, DataContract } from "@/types/contract";
 
 const API_BASE = "https://ingest-api-handsala-d4d73ec6.koyeb.app";
 
-type Tab = "csv" | "json" | "destination" | "supabase";
+type Tab = "csv" | "json" | "api" | "destination" | "supabase";
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("csv");
   const [sourceContract, setSourceContract] = useState<SourceContract | null>(null);
   const [jsonContract, setJsonContract] = useState<SourceContract | null>(null);
+  const [apiContract, setApiContract] = useState<DataContract | null>(null);
   const [dbContract, setDbContract] = useState<DataContract | null>(null);
   const [supaContract, setSupaContract] = useState<DataContract | null>(null);
   const [loading, setLoading] = useState(false);
@@ -70,6 +72,31 @@ export default function Home() {
       setJsonContract(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to analyze JSON");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAPIAnalyze = async (specURL: string) => {
+    setLoading(true);
+    setError(null);
+    setApiContract(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/analyze-api`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec_url: specURL }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || `API error: ${response.status}`);
+      }
+
+      setApiContract(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze API");
     } finally {
       setLoading(false);
     }
@@ -138,7 +165,7 @@ export default function Home() {
                 Data Contract Analyzer
               </h1>
               <p className="mt-1 text-sm" style={{ color: "oklch(45% 0.01 80)" }}>
-                Analyze CSV, JSON, and PostgreSQL databases
+                Analyze CSV, JSON, APIs, and databases
               </p>
             </div>
             <a
@@ -168,6 +195,12 @@ export default function Home() {
             onClick={() => { setTab("json"); setError(null); }}
           >
             JSON
+          </TabButton>
+          <TabButton
+            active={tab === "api"}
+            onClick={() => { setTab("api"); setError(null); }}
+          >
+            API
           </TabButton>
           <TabButton
             active={tab === "destination"}
@@ -209,6 +242,17 @@ export default function Home() {
             {jsonContract && (
               <div className="mt-12">
                 <ContractDisplay contract={jsonContract} />
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "api" && (
+          <>
+            <APISpecForm onSubmit={handleAPIAnalyze} loading={loading} disabled={loading} />
+            {apiContract && (
+              <div className="mt-12">
+                <DataContractDisplay contract={apiContract} />
               </div>
             )}
           </>
