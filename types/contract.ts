@@ -56,12 +56,14 @@ export interface ValidationRules {
 
 export interface SchemaContract {
   name: string;
+  description?: string;
   namespace?: string;
   row_count?: number;
   fields: DestinationField[];
   sample_data?: string[][];
   validation_rules: ValidationRules;
   issues?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface DataContract {
