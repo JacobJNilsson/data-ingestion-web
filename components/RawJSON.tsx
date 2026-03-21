@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 interface RawJSONProps {
   data: unknown;
@@ -8,13 +8,27 @@ interface RawJSONProps {
 
 export function RawJSON({ data }: RawJSONProps) {
   const [expanded, setExpanded] = useState(false);
-  const json = JSON.stringify(data, null, 2);
+  const [copied, setCopied] = useState(false);
+
+  const json = useMemo(() => JSON.stringify(data, null, 2), [data]);
+  const byteSize = useMemo(() => new TextEncoder().encode(json).byteLength, [json]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may fail in non-secure contexts.
+    }
+  };
 
   return (
     <section>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider mb-4"
         style={{ color: "oklch(45% 0.01 80)" }}
       >
@@ -29,7 +43,7 @@ export function RawJSON({ data }: RawJSONProps) {
         </svg>
         Raw JSON
         <span className="font-normal normal-case tracking-normal" style={{ color: "oklch(55% 0.01 80)" }}>
-          ({formatBytes(new Blob([json]).size)})
+          ({formatBytes(byteSize)})
         </span>
       </button>
 
@@ -37,14 +51,14 @@ export function RawJSON({ data }: RawJSONProps) {
         <div className="relative">
           <button
             type="button"
-            onClick={() => navigator.clipboard.writeText(json)}
+            onClick={handleCopy}
             className="absolute top-3 right-3 px-3 py-1.5 rounded text-xs font-medium transition-colors"
             style={{
-              backgroundColor: "oklch(92% 0.005 80)",
-              color: "oklch(40% 0.01 80)",
+              backgroundColor: copied ? "oklch(90% 0.03 140)" : "oklch(92% 0.005 80)",
+              color: copied ? "oklch(35% 0.08 140)" : "oklch(40% 0.01 80)",
             }}
           >
-            Copy
+            {copied ? "Copied" : "Copy"}
           </button>
           <pre
             className="overflow-x-auto p-5 rounded-lg border font-mono text-xs leading-relaxed"
