@@ -1,6 +1,7 @@
 "use client";
 
 import type { SourceContract } from "@/types/contract";
+import { RawJSON } from "@/components/RawJSON";
 
 interface ContractDisplayProps {
   contract: SourceContract;
@@ -204,6 +205,8 @@ export function ContractDisplay({ contract }: ContractDisplayProps) {
           </ul>
         </section>
       )}
+
+      <RawJSON data={contract} />
     </div>
   );
 }
