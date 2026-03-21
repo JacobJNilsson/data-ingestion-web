@@ -6,7 +6,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { ContractDisplay } from "@/components/ContractDisplay";
 import { PostgresForm } from "@/components/PostgresForm";
 import { SupabaseForm } from "@/components/SupabaseForm";
-import { DatabaseDisplay } from "@/components/DatabaseDisplay";
+import { DataContractDisplay } from "@/components/DataContractDisplay";
 import type { SourceContract, DataContract } from "@/types/contract";
 
 const API_BASE = "https://ingest-api-handsala-d4d73ec6.koyeb.app";
@@ -219,7 +219,7 @@ export default function Home() {
             <PostgresForm onSubmit={handleDbAnalyze} loading={loading} disabled={loading} />
             {dbContract && (
               <div className="mt-12">
-                <DatabaseDisplay contract={dbContract} />
+                <DataContractDisplay contract={dbContract} />
               </div>
             )}
           </>
@@ -230,7 +230,7 @@ export default function Home() {
             <SupabaseForm onSubmit={handleSupabaseAnalyze} loading={loading} disabled={loading} />
             {supaContract && (
               <div className="mt-12">
-                <DatabaseDisplay contract={supaContract} />
+                <DataContractDisplay contract={supaContract} />
               </div>
             )}
           </>

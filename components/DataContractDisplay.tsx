@@ -7,7 +7,7 @@ interface DataContractDisplayProps {
   contract: DataContract;
 }
 
-export function DatabaseDisplay({ contract }: DataContractDisplayProps) {
+export function DataContractDisplay({ contract }: DataContractDisplayProps) {
   const [expandedSchema, setExpandedSchema] = useState<string | null>(
     contract.schemas.length === 1 ? contract.schemas[0].name : null
   );
