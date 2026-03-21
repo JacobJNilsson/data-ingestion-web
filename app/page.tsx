@@ -7,7 +7,7 @@ import { ContractDisplay } from "@/components/ContractDisplay";
 import { PostgresForm } from "@/components/PostgresForm";
 import { SupabaseForm } from "@/components/SupabaseForm";
 import { DatabaseDisplay } from "@/components/DatabaseDisplay";
-import type { SourceContract, DatabaseContract } from "@/types/contract";
+import type { SourceContract, DataContract } from "@/types/contract";
 
 const API_BASE = "https://ingest-api-handsala-d4d73ec6.koyeb.app";
 
@@ -17,8 +17,8 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("csv");
   const [sourceContract, setSourceContract] = useState<SourceContract | null>(null);
   const [jsonContract, setJsonContract] = useState<SourceContract | null>(null);
-  const [dbContract, setDbContract] = useState<DatabaseContract | null>(null);
-  const [supaContract, setSupaContract] = useState<DatabaseContract | null>(null);
+  const [dbContract, setDbContract] = useState<DataContract | null>(null);
+  const [supaContract, setSupaContract] = useState<DataContract | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

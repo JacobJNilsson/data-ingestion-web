@@ -54,16 +54,19 @@ export interface ValidationRules {
   unique_constraints?: string[];
 }
 
-export interface TableContract {
-  table_name: string;
-  schema: string;
+export interface SchemaContract {
+  name: string;
+  namespace?: string;
+  row_count?: number;
   fields: DestinationField[];
+  sample_data?: string[][];
   validation_rules: ValidationRules;
+  issues?: string[];
 }
 
-export interface DatabaseContract {
+export interface DataContract {
   contract_type: string;
-  database_id: string;
-  tables: TableContract[];
+  id: string;
+  schemas: SchemaContract[];
   metadata?: Record<string, unknown>;
 }

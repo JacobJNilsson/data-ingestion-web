@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import type { DatabaseContract, TableContract, FieldConstraint } from "@/types/contract";
+import type { DataContract, SchemaContract, FieldConstraint } from "@/types/contract";
 
-interface DatabaseDisplayProps {
-  contract: DatabaseContract;
+interface DataContractDisplayProps {
+  contract: DataContract;
 }
 
-export function DatabaseDisplay({ contract }: DatabaseDisplayProps) {
-  const [expandedTable, setExpandedTable] = useState<string | null>(
-    contract.tables.length === 1 ? contract.tables[0].table_name : null
+export function DatabaseDisplay({ contract }: DataContractDisplayProps) {
+  const [expandedSchema, setExpandedSchema] = useState<string | null>(
+    contract.schemas.length === 1 ? contract.schemas[0].name : null
   );
 
   return (
@@ -20,37 +20,37 @@ export function DatabaseDisplay({ contract }: DatabaseDisplayProps) {
           className="text-sm font-semibold uppercase tracking-wider mb-6"
           style={{ color: "oklch(45% 0.01 80)" }}
         >
-          Database: {contract.database_id}
+          {contract.id}
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <StatCard label="Tables" value={contract.tables.length.toString()} />
+          <StatCard label="Schemas" value={contract.schemas.length.toString()} />
           <StatCard
-            label="Total Columns"
-            value={contract.tables
-              .reduce((sum, t) => sum + t.fields.length, 0)
+            label="Total Fields"
+            value={contract.schemas
+              .reduce((sum, s) => sum + s.fields.length, 0)
               .toLocaleString()}
           />
-          <StatCard label="Schema" value={(contract.metadata?.schema as string) || "public"} />
+          <StatCard label="Namespace" value={(contract.metadata?.schema as string) || "public"} />
         </div>
       </section>
 
-      {/* Tables */}
+      {/* Schemas */}
       <section>
         <h2
           className="text-sm font-semibold uppercase tracking-wider mb-6"
           style={{ color: "oklch(45% 0.01 80)" }}
         >
-          Tables
+          Schemas
         </h2>
         <div className="space-y-3">
-          {contract.tables.map((table) => (
-            <TableRow
-              key={table.table_name}
-              table={table}
-              expanded={expandedTable === table.table_name}
+          {contract.schemas.map((schema) => (
+            <SchemaRow
+              key={schema.name}
+              schema={schema}
+              expanded={expandedSchema === schema.name}
               onToggle={() =>
-                setExpandedTable(
-                  expandedTable === table.table_name ? null : table.table_name
+                setExpandedSchema(
+                  expandedSchema === schema.name ? null : schema.name
                 )
               }
             />
@@ -61,19 +61,19 @@ export function DatabaseDisplay({ contract }: DatabaseDisplayProps) {
   );
 }
 
-function TableRow({
-  table,
+function SchemaRow({
+  schema,
   expanded,
   onToggle,
 }: {
-  table: TableContract;
+  schema: SchemaContract;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const pkFields = table.fields.filter((f) =>
+  const pkFields = schema.fields.filter((f) =>
     f.constraints?.some((c) => c.type === "primary_key")
   );
-  const fkFields = table.fields.filter((f) =>
+  const fkFields = schema.fields.filter((f) =>
     f.constraints?.some((c) => c.type === "foreign_key")
   );
 
@@ -94,10 +94,10 @@ function TableRow({
             className="font-mono font-semibold"
             style={{ color: "oklch(20% 0.01 80)" }}
           >
-            {table.table_name}
+            {schema.name}
           </span>
           <span className="text-xs" style={{ color: "oklch(50% 0.01 80)" }}>
-            {table.fields.length} columns
+            {schema.fields.length} columns
           </span>
           {pkFields.length > 0 && (
             <span
@@ -166,7 +166,7 @@ function TableRow({
               </tr>
             </thead>
             <tbody className="divide-y" style={{ borderColor: "oklch(93% 0.005 80)" }}>
-              {table.fields.map((field, idx) => (
+              {schema.fields.map((field, idx) => (
                 <tr
                   key={idx}
                   className="transition-colors"
