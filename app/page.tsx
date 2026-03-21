@@ -165,7 +165,7 @@ export default function Home() {
                 Data Contract Analyzer
               </h1>
               <p className="mt-1 text-sm" style={{ color: "oklch(45% 0.01 80)" }}>
-                Analyze CSV, JSON, APIs, and databases
+                Analyze data sources: CSV, JSON, APIs, and databases
               </p>
             </div>
             <a
