@@ -14,10 +14,13 @@ interface MappingEditorProps {
   destFields: DestinationField[];
   onMappingsChange: (mappings: MappingRow[]) => void;
   onGenerate: () => void;
+  onAISuggest?: () => void;
   onVerify: () => void;
   verifyResult: VerifyResult | null;
   loading: boolean;
   canGenerate: boolean;
+  canAISuggest?: boolean;
+  aiLoading?: boolean;
 }
 
 export function MappingEditor({
@@ -26,15 +29,22 @@ export function MappingEditor({
   destFields,
   onMappingsChange,
   onGenerate,
+  onAISuggest,
   onVerify,
   verifyResult,
   loading,
   canGenerate,
+  canAISuggest,
+  aiLoading,
 }: MappingEditorProps) {
   const destFieldMap = new Map(destFields.map((f) => [f.name, f]));
 
   const updateMapping = (id: number, updates: Partial<MappingRow>) => {
-    onMappingsChange(mappings.map((m) => (m._id === id ? { ...m, ...updates } : m)));
+    onMappingsChange(
+      mappings.map((m) =>
+        m._id === id ? { ...m, ...updates, user_edited: true } : m
+      )
+    );
   };
 
   const handleSourceChange = (id: number, value: string) => {
@@ -59,6 +69,8 @@ export function MappingEditor({
     }
   };
 
+  const isAnyLoading = loading || (aiLoading ?? false);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -66,13 +78,20 @@ export function MappingEditor({
           Field Mappings
         </h3>
         <div className="flex gap-2">
-          <button type="button" onClick={onGenerate} disabled={!canGenerate || loading}
+          <button type="button" onClick={onGenerate} disabled={!canGenerate || isAnyLoading}
             className="px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
             style={{ backgroundColor: "oklch(35% 0.05 260)", color: "oklch(98% 0.005 80)" }}>
-            {loading ? "Working..." : "Generate"}
+            {loading && !aiLoading ? "Working..." : "Generate"}
           </button>
+          {onAISuggest && (
+            <button type="button" onClick={onAISuggest} disabled={!canAISuggest || isAnyLoading}
+              className="px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+              style={{ backgroundColor: "oklch(40% 0.08 280)", color: "oklch(98% 0.005 80)" }}>
+              {aiLoading ? "Thinking..." : "AI Suggest"}
+            </button>
+          )}
           {mappings.length > 0 && (
-            <button type="button" onClick={onVerify} disabled={loading}
+            <button type="button" onClick={onVerify} disabled={isAnyLoading}
               className="px-4 py-2 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40"
               style={{ borderColor: "oklch(80% 0.005 80)", color: "oklch(35% 0.01 80)" }}>
               Verify
@@ -132,6 +151,18 @@ export function MappingEditor({
                         {destField?.constraints?.map((c, i) => (
                           <ConstraintBadge key={i} constraint={c} />
                         ))}
+                        {m.user_edited && (
+                          <span
+                            className="text-[10px] px-1 py-0.5 rounded font-medium"
+                            style={{
+                              backgroundColor: "oklch(92% 0.02 260)",
+                              color: "oklch(45% 0.08 260)",
+                            }}
+                            title="Manually edited — AI Suggest will preserve this mapping"
+                          >
+                            edited
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-2 py-2 text-center text-xs" style={{ color: "oklch(55% 0.01 80)" }}>←</td>
