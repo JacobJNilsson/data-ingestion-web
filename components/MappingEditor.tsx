@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { FieldMapping, VerifyResult, DestinationField } from "@/types/contract";
 import { ConstraintBadge } from "@/components/badges";
 
@@ -52,13 +53,15 @@ export function MappingEditor({
 
   const handleSourceChange = (id: number, value: string) => {
     if (value === "__null__") {
-      updateMapping(id, { source_type: "null", source_field: undefined, source_constant: undefined, confidence: 0 });
+      updateMapping(id, { source_type: "null", source_field: undefined, source_constant: undefined, source_fields: undefined, transform_description: undefined, confidence: 0 });
     } else if (value === "__constant__") {
-      updateMapping(id, { source_type: "constant", source_field: undefined, source_constant: "", confidence: 0 });
+      updateMapping(id, { source_type: "constant", source_field: undefined, source_constant: "", source_fields: undefined, transform_description: undefined, confidence: 0 });
+    } else if (value === "__transform__") {
+      updateMapping(id, { source_type: "transform", source_field: undefined, source_constant: undefined, source_fields: [], transform_description: "", confidence: 0 });
     } else if (value === "__unmapped__") {
-      updateMapping(id, { source_type: "unmapped", source_field: undefined, source_constant: undefined, confidence: 0 });
+      updateMapping(id, { source_type: "unmapped", source_field: undefined, source_constant: undefined, source_fields: undefined, transform_description: undefined, confidence: 0 });
     } else {
-      updateMapping(id, { source_type: "field", source_field: value, source_constant: undefined });
+      updateMapping(id, { source_type: "field", source_field: value, source_constant: undefined, source_fields: undefined, transform_description: undefined });
     }
   };
 
@@ -66,6 +69,7 @@ export function MappingEditor({
     switch (m.source_type) {
       case "null": return "__null__";
       case "constant": return "__constant__";
+      case "transform": return "__transform__";
       case "unmapped": return "__unmapped__";
       case "field": return m.source_field ?? "";
       default: return "__unmapped__";
@@ -138,7 +142,7 @@ export function MappingEditor({
               {mappings.map((m, idx) => {
                 const destField = destFieldMap.get(m.destination_field);
                 const isRequired = destField ? !destField.nullable : false;
-                const needsAttention = isRequired && m.source_type !== "field" && m.source_type !== "constant";
+                const needsAttention = isRequired && m.source_type !== "field" && m.source_type !== "constant" && m.source_type !== "transform";
 
                 return (
                   <tr key={m._id ?? idx} style={{
@@ -185,6 +189,13 @@ export function MappingEditor({
                             className="text-xs px-1.5 py-1 rounded" style={{ color: "oklch(55% 0.01 80)" }}
                             aria-label="Back to dropdown">×</button>
                         </div>
+                      ) : m.source_type === "transform" ? (
+                        <TransformInputs
+                          mapping={m}
+                          onFieldsChange={(fields) => updateMapping(m._id!, { source_fields: fields })}
+                          onDescriptionChange={(desc) => updateMapping(m._id!, { transform_description: desc })}
+                          onDismiss={() => handleSourceChange(m._id!, "__unmapped__")}
+                        />
                       ) : (
                         <select
                           value={selectValue(m)}
@@ -196,6 +207,7 @@ export function MappingEditor({
                           <option value="__unmapped__">(unmapped)</option>
                           <option value="__null__">NULL</option>
                           <option value="__constant__">Constant value...</option>
+                          <option value="__transform__">Transform...</option>
                           <option disabled>───────</option>
                           {sourceFieldNames.map((name) => (
                             <option key={name} value={name}>{name}</option>
@@ -231,6 +243,61 @@ export function MappingEditor({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// TransformInputs manages its own local text state for the source fields
+// input so the user can type freely. The parsed array is committed on blur.
+function TransformInputs({
+  mapping,
+  onFieldsChange,
+  onDescriptionChange,
+  onDismiss,
+}: {
+  mapping: MappingRow;
+  onFieldsChange: (fields: string[]) => void;
+  onDescriptionChange: (desc: string) => void;
+  onDismiss: () => void;
+}) {
+  const [fieldsText, setFieldsText] = useState(
+    (mapping.source_fields ?? []).join(", ")
+  );
+
+  const commitFields = () => {
+    const fields = fieldsText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    onFieldsChange(fields);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={fieldsText}
+          onChange={(e) => setFieldsText(e.target.value)}
+          onBlur={commitFields}
+          placeholder="field_a, field_b"
+          className="flex-1 px-2 py-1 border rounded font-mono text-xs"
+          style={{ borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" }}
+          aria-label={`Source fields for ${mapping.destination_field}`}
+        />
+        <button type="button" onClick={onDismiss}
+          className="text-xs px-1.5 py-1 rounded" style={{ color: "oklch(55% 0.01 80)" }}
+          aria-label="Back to dropdown">×</button>
+      </div>
+      <input
+        type="text"
+        value={mapping.transform_description ?? ""}
+        onChange={(e) => onDescriptionChange(e.target.value)}
+        placeholder="Describe the transformation..."
+        className="w-full px-2 py-1 border rounded text-xs"
+        style={{ borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" }}
+        aria-label={`Transform description for ${mapping.destination_field}`}
+      />
     </div>
   );
 }

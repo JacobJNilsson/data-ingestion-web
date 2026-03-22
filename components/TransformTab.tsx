@@ -334,6 +334,8 @@ function buildTransformContract(mappings: FieldMapping[]): TransformContract {
       source_type: m.source_type || "unmapped",
       source_field: m.source_type === "field" ? m.source_field : undefined,
       source_constant: m.source_type === "constant" ? m.source_constant : undefined,
+      source_fields: m.source_type === "transform" ? m.source_fields : undefined,
+      transform_description: m.source_type === "transform" ? m.transform_description : undefined,
       transformation: m.transformation,
       confidence: m.confidence,
       user_edited: m.user_edited,
