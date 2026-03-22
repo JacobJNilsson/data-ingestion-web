@@ -41,9 +41,12 @@ export function MappingEditor({
 
   const updateMapping = (id: number, updates: Partial<MappingRow>) => {
     onMappingsChange(
-      mappings.map((m) =>
-        m._id === id ? { ...m, ...updates, user_edited: true } : m
-      )
+      mappings.map((m) => {
+        if (m._id !== id) return m;
+        const updated = { ...m, ...updates };
+        updated.user_edited = updated.source_type !== "unmapped";
+        return updated;
+      })
     );
   };
 
