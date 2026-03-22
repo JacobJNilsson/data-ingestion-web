@@ -8,6 +8,7 @@ import { API_BASE } from "@/lib/constants";
 import type {
   SourceContract,
   DataContract,
+  DestinationField,
   FieldMapping,
   TransformContract,
   VerifyResult,
@@ -59,6 +60,7 @@ export function TransformTab() {
 
   const sourceFields = extractFields(sourceContract, sourceSchemaIdx);
   const destFields = extractFields(destContract, destSchemaIdx);
+  const destFieldsFull = extractDestFields(destContract, destSchemaIdx);
   const sourceFieldNames = sourceFields.map((f) => f.Name);
   const canGenerate = sourceFields.length > 0 && destFields.length > 0;
 
@@ -80,8 +82,11 @@ export function TransformTab() {
         throw new Error(body?.error || `API error: ${resp.status}`);
       }
       const data = await resp.json();
+      // Normalize API response: ensure source_type is set based on
+      // whether source_field is populated.
       const generated: FieldMapping[] = (data.mappings || []).map((m: FieldMapping) => ({
         ...m,
+        source_type: m.source_type || (m.source_field ? "field" : "unmapped"),
         _id: nextMappingId++,
         confidence: m.confidence ?? 0,
       }));
@@ -146,6 +151,7 @@ export function TransformTab() {
       <MappingEditor
         mappings={mappings}
         sourceFieldNames={sourceFieldNames}
+        destFields={destFieldsFull}
         onMappingsChange={handleMappingsChange}
         onGenerate={handleGenerate}
         onVerify={handleVerify}
@@ -204,8 +210,21 @@ function extractFields(contract: SourceContract | DataContract | null, schemaInd
     }));
   }
 
-  // Source contract (CSV, JSON)
   return contract.fields.map((f) => ({ Name: f.name, DataType: f.data_type }));
+}
+
+function extractDestFields(contract: SourceContract | DataContract | null, schemaIndex: number): DestinationField[] {
+  if (!contract) return [];
+  if (isDataContract(contract)) {
+    const schema = contract.schemas[schemaIndex];
+    return schema?.fields ?? [];
+  }
+  // Source contracts don't have DestinationField shape — adapt
+  return (contract as SourceContract).fields.map((f) => ({
+    name: f.name,
+    data_type: f.data_type,
+    nullable: true, // source fields have no nullability constraint
+  }));
 }
 
 function buildTransformContract(mappings: FieldMapping[]): TransformContract {
@@ -214,11 +233,13 @@ function buildTransformContract(mappings: FieldMapping[]): TransformContract {
     transformation_id: "manual",
     source_ref: "source",
     destination_ref: "destination",
-    field_mappings: mappings.map(({ source_field, destination_field, transformation, confidence }) => ({
-      source_field,
-      destination_field,
-      transformation,
-      confidence,
+    field_mappings: mappings.map((m) => ({
+      destination_field: m.destination_field,
+      source_type: m.source_type || "unmapped",
+      source_field: m.source_type === "field" ? m.source_field : undefined,
+      source_constant: m.source_type === "constant" ? m.source_constant : undefined,
+      transformation: m.transformation,
+      confidence: m.confidence,
     })),
     execution_plan: {
       batch_size: 100,
