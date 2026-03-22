@@ -72,3 +72,44 @@ export interface DataContract {
   schemas: SchemaContract[];
   metadata?: Record<string, unknown>;
 }
+
+// Transformation contract types
+
+export interface FieldTransformation {
+  type: "rename" | "cast" | "format" | "default";
+  parameters?: Record<string, unknown>;
+}
+
+export interface FieldMapping {
+  source_field: string;
+  destination_field: string;
+  transformation?: FieldTransformation;
+  confidence: number;
+}
+
+export interface ExecutionPlan {
+  batch_size: number;
+  error_threshold: number;
+  validation_enabled: boolean;
+}
+
+export interface TransformContract {
+  contract_type: "transformation";
+  transformation_id: string;
+  source_ref: string;
+  destination_ref: string;
+  field_mappings: FieldMapping[];
+  execution_plan: ExecutionPlan;
+  metadata?: Record<string, unknown>;
+}
+
+// Verification result
+
+export interface VerifyResult {
+  valid: boolean;
+  contract_type: string;
+  issues?: string[];
+}
+
+// Common type for any analyzed contract (source or destination)
+export type AnalyzedContract = SourceContract | DataContract;
