@@ -4,11 +4,12 @@ import type { SourceContract, DataContract } from "@/types/contract";
 
 interface CompactSummaryProps {
   contract: SourceContract | DataContract;
+  selectedSchemaIndex?: number;
 }
 
-export function CompactSummary({ contract }: CompactSummaryProps) {
+export function CompactSummary({ contract, selectedSchemaIndex }: CompactSummaryProps) {
   if ("schemas" in contract && "id" in contract) {
-    return <DataContractSummaryView contract={contract as DataContract} />;
+    return <DataContractSummaryView contract={contract as DataContract} selectedSchemaIndex={selectedSchemaIndex ?? 0} />;
   }
   return <SourceSummary contract={contract as SourceContract} />;
 }
@@ -31,28 +32,23 @@ function SourceSummary({ contract }: { contract: SourceContract }) {
   );
 }
 
-function DataContractSummaryView({ contract }: { contract: DataContract }) {
-  const totalFields = contract.schemas.reduce((sum, s) => sum + s.fields.length, 0);
+function DataContractSummaryView({ contract, selectedSchemaIndex }: { contract: DataContract; selectedSchemaIndex: number }) {
+  const selected = contract.schemas[selectedSchemaIndex];
+  if (!selected) return null;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <Badge>{contract.id}</Badge>
+        <Badge>{selected.name}</Badge>
         <span className="text-xs" style={{ color: "oklch(50% 0.01 80)" }}>
-          {contract.schemas.length} schemas, {totalFields} fields
+          {selected.fields.length} fields
         </span>
       </div>
-      {contract.schemas.map((s) => (
-        <div key={s.name} className="space-y-1">
-          <span className="text-xs font-mono font-medium" style={{ color: "oklch(35% 0.01 80)" }}>
-            {s.name}
-          </span>
-          <div className="flex flex-wrap gap-1">
-            {s.fields.map((f) => (
-              <FieldBadge key={f.name} name={f.name} type={f.data_type} />
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="flex flex-wrap gap-1">
+        {selected.fields.map((f) => (
+          <FieldBadge key={f.name} name={f.name} type={f.data_type} />
+        ))}
+      </div>
     </div>
   );
 }

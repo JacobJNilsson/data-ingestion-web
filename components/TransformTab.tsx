@@ -18,6 +18,8 @@ let nextMappingId = 1;
 export function TransformTab() {
   const [sourceContract, setSourceContract] = useState<SourceContract | DataContract | null>(null);
   const [destContract, setDestContract] = useState<SourceContract | DataContract | null>(null);
+  const [sourceSchemaIdx, setSourceSchemaIdx] = useState(0);
+  const [destSchemaIdx, setDestSchemaIdx] = useState(0);
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -26,12 +28,26 @@ export function TransformTab() {
 
   const handleSourceChange = useCallback((contract: SourceContract | DataContract | null) => {
     setSourceContract(contract);
+    setSourceSchemaIdx(0);
     setMappings([]);
     setVerifyResult(null);
   }, []);
 
   const handleDestChange = useCallback((contract: SourceContract | DataContract | null) => {
     setDestContract(contract);
+    setDestSchemaIdx(0);
+    setMappings([]);
+    setVerifyResult(null);
+  }, []);
+
+  const handleSourceSchemaSelect = useCallback((idx: number) => {
+    setSourceSchemaIdx(idx);
+    setMappings([]);
+    setVerifyResult(null);
+  }, []);
+
+  const handleDestSchemaSelect = useCallback((idx: number) => {
+    setDestSchemaIdx(idx);
     setMappings([]);
     setVerifyResult(null);
   }, []);
@@ -41,8 +57,8 @@ export function TransformTab() {
     setVerifyResult(null);
   }, []);
 
-  const sourceFields = extractFields(sourceContract);
-  const destFields = extractFields(destContract);
+  const sourceFields = extractFields(sourceContract, sourceSchemaIdx);
+  const destFields = extractFields(destContract, destSchemaIdx);
   const destFieldNames = destFields.map((f) => f.Name);
   const canGenerate = sourceFields.length > 0 && destFields.length > 0;
 
@@ -113,12 +129,16 @@ export function TransformTab() {
         <AnalyzerPanel
           label="Source"
           contract={sourceContract}
+          selectedSchemaIndex={sourceSchemaIdx}
           onContractChange={handleSourceChange}
+          onSchemaSelect={handleSourceSchemaSelect}
         />
         <AnalyzerPanel
           label="Destination"
           contract={destContract}
+          selectedSchemaIndex={destSchemaIdx}
           onContractChange={handleDestChange}
+          onSchemaSelect={handleDestSchemaSelect}
         />
       </div>
 
@@ -171,17 +191,17 @@ function isDataContract(c: SourceContract | DataContract): c is DataContract {
   return "schemas" in c && "id" in c;
 }
 
-function extractFields(contract: SourceContract | DataContract | null): APIField[] {
+function extractFields(contract: SourceContract | DataContract | null, schemaIndex: number): APIField[] {
   if (!contract) return [];
 
   if (isDataContract(contract)) {
-    return contract.schemas.flatMap((s) =>
-      s.fields.map((f) => ({
-        Name: contract.schemas.length > 1 ? `${s.name}.${f.name}` : f.name,
-        DataType: f.data_type,
-        Nullable: f.nullable,
-      }))
-    );
+    const schema = contract.schemas[schemaIndex];
+    if (!schema) return [];
+    return schema.fields.map((f) => ({
+      Name: f.name,
+      DataType: f.data_type,
+      Nullable: f.nullable,
+    }));
   }
 
   // Source contract (CSV, JSON)

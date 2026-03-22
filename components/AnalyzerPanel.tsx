@@ -15,10 +15,12 @@ export type AnalyzerType = "csv" | "json" | "api" | "postgresql" | "supabase";
 interface AnalyzerPanelProps {
   label: string;
   contract: SourceContract | DataContract | null;
+  selectedSchemaIndex: number;
   onContractChange: (contract: SourceContract | DataContract | null) => void;
+  onSchemaSelect: (index: number) => void;
 }
 
-export function AnalyzerPanel({ label, contract, onContractChange }: AnalyzerPanelProps) {
+export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContractChange, onSchemaSelect }: AnalyzerPanelProps) {
   const [type, setType] = useState<AnalyzerType>("csv");
   const [loading, setLoading] = useState(false);
   const [panelError, setPanelError] = useState("");
@@ -140,7 +142,36 @@ export function AnalyzerPanel({ label, contract, onContractChange }: AnalyzerPan
               Clear
             </button>
           </div>
-          <CompactSummary contract={contract} />
+          {/* Schema selector for multi-schema contracts */}
+          {"schemas" in contract && "id" in contract && (contract as DataContract).schemas.length > 1 && (
+            <div className="mb-3">
+              <label
+                htmlFor={`${label.toLowerCase()}-schema-select`}
+                className="block text-xs mb-1"
+                style={{ color: "oklch(50% 0.01 80)" }}
+              >
+                Select schema to map
+              </label>
+              <select
+                id={`${label.toLowerCase()}-schema-select`}
+                value={selectedSchemaIndex}
+                onChange={(e) => onSchemaSelect(parseInt(e.target.value, 10))}
+                className="w-full px-3 py-1.5 border rounded text-sm font-mono"
+                style={{
+                  borderColor: "oklch(85% 0.005 80)",
+                  color: "oklch(30% 0.01 80)",
+                  backgroundColor: "oklch(100% 0 0)",
+                }}
+              >
+                {(contract as DataContract).schemas.map((s, i) => (
+                  <option key={i} value={i}>
+                    {s.name} ({s.fields.length} fields)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <CompactSummary contract={contract} selectedSchemaIndex={selectedSchemaIndex} />
         </div>
       ) : (
         <div>
