@@ -85,9 +85,10 @@ export type SourceType = "field" | "null" | "constant" | "unmapped" | "transform
 export interface FieldMapping {
   destination_field: string;
   source_type: SourceType;
+  source_ref?: string;
   source_field?: string;
   source_constant?: string;
-  source_fields?: string[];
+  source_fields?: { ref: string; field: string }[];
   transform_description?: string;
   transformation?: FieldTransformation;
   confidence: number;
@@ -100,12 +101,17 @@ export interface ExecutionPlan {
   validation_enabled: boolean;
 }
 
+export interface MappingGroup {
+  destination_ref: string;
+  field_mappings: FieldMapping[];
+}
+
 export interface TransformContract {
   contract_type: "transformation";
   transformation_id: string;
-  source_ref: string;
-  destination_ref: string;
-  field_mappings: FieldMapping[];
+  source_refs: string[];
+  destination_refs: string[];
+  mapping_groups: MappingGroup[];
   execution_plan: ExecutionPlan;
   metadata?: Record<string, unknown>;
 }

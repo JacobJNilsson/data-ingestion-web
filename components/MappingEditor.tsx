@@ -4,14 +4,24 @@ import { useState } from "react";
 import type { FieldMapping, VerifyResult, DestinationField } from "@/types/contract";
 import { ConstraintBadge } from "@/components/badges";
 
+// Delimiter for encoding ref+field in dropdown option values.
+// Using null byte avoids collision with any user-typed label content.
+export const REF_DELIM = "\x00";
+
 // Extended mapping with stable ID for React keys.
 export interface MappingRow extends FieldMapping {
   _id?: number;
 }
 
+// NamedSourceGroup pairs a source ref with its field names.
+export interface NamedSourceGroup {
+  ref: string;
+  fieldNames: string[];
+}
+
 interface MappingEditorProps {
   mappings: MappingRow[];
-  sourceFieldNames: string[];
+  sourceGroups: NamedSourceGroup[];
   destFields: DestinationField[];
   onMappingsChange: (mappings: MappingRow[]) => void;
   onGenerate: () => void;
@@ -26,7 +36,7 @@ interface MappingEditorProps {
 
 export function MappingEditor({
   mappings,
-  sourceFieldNames,
+  sourceGroups,
   destFields,
   onMappingsChange,
   onGenerate,
@@ -39,6 +49,7 @@ export function MappingEditor({
   aiLoading,
 }: MappingEditorProps) {
   const destFieldMap = new Map(destFields.map((f) => [f.name, f]));
+  const hasMultipleSources = sourceGroups.length > 1;
 
   const updateMapping = (id: number, updates: Partial<MappingRow>) => {
     onMappingsChange(
@@ -53,15 +64,23 @@ export function MappingEditor({
 
   const handleSourceChange = (id: number, value: string) => {
     if (value === "__null__") {
-      updateMapping(id, { source_type: "null", source_field: undefined, source_constant: undefined, source_fields: undefined, transform_description: undefined, confidence: 0 });
+      updateMapping(id, { source_type: "null", source_ref: undefined, source_field: undefined, source_constant: undefined, source_fields: undefined, transform_description: undefined, confidence: 0 });
     } else if (value === "__constant__") {
-      updateMapping(id, { source_type: "constant", source_field: undefined, source_constant: "", source_fields: undefined, transform_description: undefined, confidence: 0 });
+      updateMapping(id, { source_type: "constant", source_ref: undefined, source_field: undefined, source_constant: "", source_fields: undefined, transform_description: undefined, confidence: 0 });
     } else if (value === "__transform__") {
-      updateMapping(id, { source_type: "transform", source_field: undefined, source_constant: undefined, source_fields: [], transform_description: "", confidence: 0 });
+      updateMapping(id, { source_type: "transform", source_ref: undefined, source_field: undefined, source_constant: undefined, source_fields: [], transform_description: "", confidence: 0 });
     } else if (value === "__unmapped__") {
-      updateMapping(id, { source_type: "unmapped", source_field: undefined, source_constant: undefined, source_fields: undefined, transform_description: undefined, confidence: 0 });
+      updateMapping(id, { source_type: "unmapped", source_ref: undefined, source_field: undefined, source_constant: undefined, source_fields: undefined, transform_description: undefined, confidence: 0 });
     } else {
-      updateMapping(id, { source_type: "field", source_field: value, source_constant: undefined, source_fields: undefined, transform_description: undefined });
+      // value is "ref\x00field" (multi-source) or just "field" (single source)
+      const delimIdx = value.indexOf(REF_DELIM);
+      if (delimIdx >= 0) {
+        const ref = value.substring(0, delimIdx);
+        const field = value.substring(delimIdx + 1);
+        updateMapping(id, { source_type: "field", source_ref: ref, source_field: field, source_constant: undefined, source_fields: undefined, transform_description: undefined });
+      } else {
+        updateMapping(id, { source_type: "field", source_ref: sourceGroups[0]?.ref, source_field: value, source_constant: undefined, source_fields: undefined, transform_description: undefined });
+      }
     }
   };
 
@@ -71,7 +90,12 @@ export function MappingEditor({
       case "constant": return "__constant__";
       case "transform": return "__transform__";
       case "unmapped": return "__unmapped__";
-      case "field": return m.source_field ?? "";
+      case "field": {
+        if (hasMultipleSources && m.source_ref) {
+          return `${m.source_ref}${REF_DELIM}${m.source_field ?? ""}`;
+        }
+        return m.source_field ?? "";
+      }
       default: return "__unmapped__";
     }
   };
@@ -209,9 +233,21 @@ export function MappingEditor({
                           <option value="__constant__">Constant value...</option>
                           <option value="__transform__">Transform...</option>
                           <option disabled>───────</option>
-                          {sourceFieldNames.map((name) => (
-                            <option key={name} value={name}>{name}</option>
-                          ))}
+                          {hasMultipleSources ? (
+                            sourceGroups.map((group) => (
+                              <optgroup key={group.ref} label={group.ref}>
+                                {group.fieldNames.map((name) => (
+                                  <option key={`${group.ref}${REF_DELIM}${name}`} value={`${group.ref}${REF_DELIM}${name}`}>
+                                    {name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))
+                          ) : (
+                            sourceGroups[0]?.fieldNames.map((name) => (
+                              <option key={name} value={name}>{name}</option>
+                            ))
+                          )}
                         </select>
                       )}
                     </td>
@@ -247,8 +283,8 @@ export function MappingEditor({
   );
 }
 
-// TransformInputs manages its own local text state for the source fields
-// input so the user can type freely. The parsed array is committed on blur.
+// TransformInputs manages its own local text state for the source_fields
+// comma-separated input. Parses to structured array on blur.
 function TransformInputs({
   mapping,
   onFieldsChange,
@@ -256,19 +292,26 @@ function TransformInputs({
   onDismiss,
 }: {
   mapping: MappingRow;
-  onFieldsChange: (fields: string[]) => void;
+  onFieldsChange: (fields: { ref: string; field: string }[]) => void;
   onDescriptionChange: (desc: string) => void;
   onDismiss: () => void;
 }) {
   const [fieldsText, setFieldsText] = useState(
-    (mapping.source_fields ?? []).join(", ")
+    (mapping.source_fields ?? []).map((f) => f.ref ? `${f.ref}:${f.field}` : f.field).join(", ")
   );
 
   const commitFields = () => {
     const fields = fieldsText
       .split(",")
       .map((s) => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((s) => {
+        const colonIdx = s.indexOf(":");
+        if (colonIdx > 0) {
+          return { ref: s.substring(0, colonIdx), field: s.substring(colonIdx + 1) };
+        }
+        return { ref: "", field: s };
+      });
     onFieldsChange(fields);
   };
 
@@ -280,7 +323,7 @@ function TransformInputs({
           value={fieldsText}
           onChange={(e) => setFieldsText(e.target.value)}
           onBlur={commitFields}
-          placeholder="field_a, field_b"
+          placeholder="source:field_a, source:field_b"
           className="flex-1 px-2 py-1 border rounded font-mono text-xs"
           style={{ borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" }}
           aria-label={`Source fields for ${mapping.destination_field}`}
