@@ -96,7 +96,7 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContract
         >
           <option value="csv">CSV</option>
           <option value="json">JSON / NDJSON</option>
-          <option value="api">API (OpenAPI)</option>
+          <option value="api">API (OpenAPI / Swagger)</option>
           <option value="postgresql">PostgreSQL</option>
           <option value="supabase">Supabase</option>
         </select>
