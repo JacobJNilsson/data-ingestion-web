@@ -206,7 +206,7 @@ export default function Home() {
             active={tab === "destination"}
             onClick={() => { setTab("destination"); setError(null); }}
           >
-            Destination (PostgreSQL)
+            PostgreSQL
           </TabButton>
           <TabButton
             active={tab === "supabase"}
