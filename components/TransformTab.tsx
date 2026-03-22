@@ -59,7 +59,7 @@ export function TransformTab() {
 
   const sourceFields = extractFields(sourceContract, sourceSchemaIdx);
   const destFields = extractFields(destContract, destSchemaIdx);
-  const destFieldNames = destFields.map((f) => f.Name);
+  const sourceFieldNames = sourceFields.map((f) => f.Name);
   const canGenerate = sourceFields.length > 0 && destFields.length > 0;
 
   const handleGenerate = async () => {
@@ -145,7 +145,7 @@ export function TransformTab() {
       {/* Mapping editor */}
       <MappingEditor
         mappings={mappings}
-        destFieldNames={destFieldNames}
+        sourceFieldNames={sourceFieldNames}
         onMappingsChange={handleMappingsChange}
         onGenerate={handleGenerate}
         onVerify={handleVerify}
