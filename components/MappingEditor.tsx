@@ -11,7 +11,7 @@ let nextId = 1;
 
 interface MappingEditorProps {
   mappings: MappingRow[];
-  destFieldNames: string[];
+  sourceFieldNames: string[];
   onMappingsChange: (mappings: MappingRow[]) => void;
   onGenerate: () => void;
   onVerify: () => void;
@@ -22,7 +22,7 @@ interface MappingEditorProps {
 
 export function MappingEditor({
   mappings,
-  destFieldNames,
+  sourceFieldNames,
   onMappingsChange,
   onGenerate,
   onVerify,
@@ -37,16 +37,7 @@ export function MappingEditor({
     onMappingsChange(updated);
   };
 
-  const removeMapping = (id: number) => {
-    onMappingsChange(mappings.filter((m) => m._id !== id));
-  };
 
-  const addMapping = () => {
-    onMappingsChange([
-      ...mappings,
-      { source_field: "", destination_field: "", confidence: 0, _id: nextId++ },
-    ]);
-  };
 
   return (
     <div>
@@ -111,52 +102,35 @@ export function MappingEditor({
           <table className="w-full">
             <thead style={{ backgroundColor: "oklch(96% 0.005 80)" }}>
               <tr>
-                <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Source</th>
-                <th className="px-2 py-2 text-xs" style={{ color: "oklch(55% 0.01 80)" }}>→</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Destination</th>
+                <th className="px-2 py-2 text-xs" style={{ color: "oklch(55% 0.01 80)" }}>←</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Source</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Transform</th>
                 <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>Conf.</th>
-                <th className="w-8" />
               </tr>
             </thead>
             <tbody className="divide-y" style={{ borderColor: "oklch(93% 0.005 80)" }}>
               {mappings.map((m, idx) => (
                 <tr key={m._id ?? idx} style={{ backgroundColor: idx % 2 === 0 ? "transparent" : "oklch(99% 0.002 80)" }}>
                   <td className="px-4 py-2">
-                    <input
-                      type="text"
+                    <span className="font-mono text-xs font-medium" style={{ color: "oklch(25% 0.01 80)" }}>
+                      {m.destination_field}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-center text-xs" style={{ color: "oklch(55% 0.01 80)" }}>←</td>
+                  <td className="px-4 py-2">
+                    <select
                       value={m.source_field}
                       onChange={(e) => updateMapping(m._id!, { source_field: e.target.value })}
                       className="w-full px-2 py-1 border rounded font-mono text-xs"
                       style={{ borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" }}
-                      aria-label={`Source field for mapping ${idx + 1}`}
-                    />
-                  </td>
-                  <td className="px-2 py-2 text-center text-xs" style={{ color: "oklch(55% 0.01 80)" }}>→</td>
-                  <td className="px-4 py-2">
-                    {destFieldNames.length > 0 ? (
-                      <select
-                        value={m.destination_field}
-                        onChange={(e) => updateMapping(m._id!, { destination_field: e.target.value })}
-                        className="w-full px-2 py-1 border rounded font-mono text-xs"
-                        style={{ borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" }}
-                        aria-label={`Destination field for mapping ${idx + 1}`}
-                      >
-                        <option value="">Select field...</option>
-                        {destFieldNames.map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={m.destination_field}
-                        onChange={(e) => updateMapping(m._id!, { destination_field: e.target.value })}
-                        className="w-full px-2 py-1 border rounded font-mono text-xs"
-                        style={{ borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" }}
-                        aria-label={`Destination field for mapping ${idx + 1}`}
-                      />
-                    )}
+                      aria-label={`Source field for ${m.destination_field}`}
+                    >
+                      <option value="">(unmapped)</option>
+                      {sourceFieldNames.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-2">
                     {m.transformation ? (
@@ -175,17 +149,7 @@ export function MappingEditor({
                       {(m.confidence ?? 0).toFixed(1)}
                     </span>
                   </td>
-                  <td className="px-2 py-2">
-                    <button
-                      type="button"
-                      onClick={() => removeMapping(m._id!)}
-                      className="text-xs p-1 rounded transition-colors"
-                      style={{ color: "oklch(55% 0.01 80)" }}
-                      aria-label={`Remove mapping ${idx + 1}`}
-                    >
-                      ×
-                    </button>
-                  </td>
+
                 </tr>
               ))}
             </tbody>
@@ -204,17 +168,7 @@ export function MappingEditor({
         </div>
       )}
 
-      {/* Add mapping button */}
-      {mappings.length > 0 && (
-        <button
-          type="button"
-          onClick={addMapping}
-          className="mt-2 text-xs font-medium px-3 py-1.5 rounded border transition-colors"
-          style={{ borderColor: "oklch(85% 0.005 80)", color: "oklch(45% 0.01 80)" }}
-        >
-          + Add mapping
-        </button>
-      )}
+
     </div>
   );
 }
