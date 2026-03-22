@@ -1,0 +1,2 @@
+{"type":"convention","content":"API_BASE hardcoded in lib/constants.ts. All API calls use fetch with error handling: check response.ok, parse error body as JSON, fall back to status text.","classification":"tactical","recorded_at":"2026-03-22T15:32:09.306Z","id":"mx-799ee7"}
+{"type":"reference","name":"api-base-url","description":"API_BASE: https://ingest-api-handsala-d4d73ec6.koyeb.app (defined in lib/constants.ts)","classification":"foundational","recorded_at":"2026-03-22T15:32:11.025Z","id":"mx-9b88e9"}
