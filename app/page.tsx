@@ -12,7 +12,7 @@ import { TransformTab } from "@/components/TransformTab";
 import type { SourceContract, DataContract } from "@/types/contract";
 import { API_BASE } from "@/lib/constants";
 
-type Tab = "csv" | "json" | "api" | "destination" | "supabase" | "transform";
+type Tab = "csv" | "json" | "excel" | "api" | "destination" | "supabase" | "transform";
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("csv");
@@ -20,6 +20,7 @@ export default function Home() {
   const [jsonContract, setJsonContract] = useState<SourceContract | null>(null);
   const [apiContract, setApiContract] = useState<DataContract | null>(null);
   const [dbContract, setDbContract] = useState<DataContract | null>(null);
+  const [excelContract, setExcelContract] = useState<DataContract | null>(null);
   const [supaContract, setSupaContract] = useState<DataContract | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,33 @@ export default function Home() {
       setJsonContract(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to analyze JSON");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExcelUpload = async (file: File) => {
+    setLoading(true);
+    setError(null);
+    setExcelContract(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`${API_BASE}/api/v1/analyze-excel`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || `API error: ${response.status}`);
+      }
+
+      setExcelContract(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to analyze Excel file");
     } finally {
       setLoading(false);
     }
@@ -165,7 +193,7 @@ export default function Home() {
                 Data Contract Analyzer
               </h1>
               <p className="mt-1 text-sm" style={{ color: "oklch(45% 0.01 80)" }}>
-                Analyze CSV, JSON, APIs, and databases
+                Analyze CSV, JSON, Excel, APIs, and databases
               </p>
             </div>
             <a
@@ -195,6 +223,12 @@ export default function Home() {
             onClick={() => { setTab("json"); setError(null); }}
           >
             JSON
+          </TabButton>
+          <TabButton
+            active={tab === "excel"}
+            onClick={() => { setTab("excel"); setError(null); }}
+          >
+            Excel
           </TabButton>
           <TabButton
             active={tab === "api"}
@@ -248,6 +282,25 @@ export default function Home() {
             {jsonContract && (
               <div className="mt-12">
                 <ContractDisplay contract={jsonContract} />
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "excel" && (
+          <>
+            <FileUpload
+              onFileUpload={handleExcelUpload}
+              loading={loading}
+              disabled={loading}
+              accept=".xlsx,.xlsm,.xltx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              label="Upload Excel Spreadsheet"
+              hint=".xlsx / .xlsm / .xltx files"
+              id="excel-upload"
+            />
+            {excelContract && (
+              <div className="mt-12">
+                <DataContractDisplay contract={excelContract} />
               </div>
             )}
           </>

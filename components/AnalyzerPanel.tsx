@@ -10,7 +10,7 @@ import { CompactSummary } from "@/components/CompactSummary";
 import { API_BASE } from "@/lib/constants";
 import type { SourceContract, DataContract } from "@/types/contract";
 
-export type AnalyzerType = "csv" | "json" | "api" | "postgresql" | "supabase";
+export type AnalyzerType = "csv" | "json" | "excel" | "api" | "postgresql" | "supabase";
 
 interface AnalyzerPanelProps {
   label: string;
@@ -96,6 +96,7 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContract
         >
           <option value="csv">CSV</option>
           <option value="json">JSON / NDJSON</option>
+          <option value="excel">Excel (.xlsx)</option>
           <option value="api">API (OpenAPI / Swagger)</option>
           <option value="postgresql">PostgreSQL</option>
           <option value="supabase">Supabase</option>
@@ -191,6 +192,17 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContract
               label="Upload JSON or NDJSON"
               hint=".json / .ndjson / .jsonl files"
               id={`${label.toLowerCase()}-json-upload`}
+            />
+          )}
+          {type === "excel" && (
+            <FileUpload
+              onFileUpload={(f) => analyzeFile(f, "/api/v1/analyze-excel")}
+              loading={loading}
+              disabled={loading}
+              accept=".xlsx,.xlsm,.xltx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              label="Upload Excel Spreadsheet"
+              hint=".xlsx / .xlsm / .xltx files"
+              id={`${label.toLowerCase()}-excel-upload`}
             />
           )}
           {type === "api" && (
