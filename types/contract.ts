@@ -80,9 +80,13 @@ export interface FieldTransformation {
   parameters?: Record<string, unknown>;
 }
 
+export type SourceType = "field" | "null" | "constant" | "unmapped";
+
 export interface FieldMapping {
-  source_field: string;
   destination_field: string;
+  source_type: SourceType;
+  source_field?: string;
+  source_constant?: string;
   transformation?: FieldTransformation;
   confidence: number;
 }
