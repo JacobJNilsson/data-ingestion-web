@@ -8,11 +8,11 @@ import { PostgresForm } from "@/components/PostgresForm";
 import { SupabaseForm } from "@/components/SupabaseForm";
 import { APISpecForm } from "@/components/APISpecForm";
 import { DataContractDisplay } from "@/components/DataContractDisplay";
+import { TransformTab } from "@/components/TransformTab";
 import type { SourceContract, DataContract } from "@/types/contract";
+import { API_BASE } from "@/lib/constants";
 
-const API_BASE = "https://ingest-api-handsala-d4d73ec6.koyeb.app";
-
-type Tab = "csv" | "json" | "api" | "destination" | "supabase";
+type Tab = "csv" | "json" | "api" | "destination" | "supabase" | "transform";
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("csv");
@@ -214,6 +214,12 @@ export default function Home() {
           >
             Supabase
           </TabButton>
+          <TabButton
+            active={tab === "transform"}
+            onClick={() => { setTab("transform"); setError(null); }}
+          >
+            Transform
+          </TabButton>
         </div>
 
         {/* Tab content */}
@@ -280,7 +286,9 @@ export default function Home() {
           </>
         )}
 
-        {/* Error — shared across both tabs */}
+        {tab === "transform" && <TransformTab />}
+
+        {/* Error — shared across all tabs */}
         {error && (
           <div
             className="mt-6 p-4 border-l-4 rounded-r"
