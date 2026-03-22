@@ -89,6 +89,7 @@ export interface FieldMapping {
   source_constant?: string;
   transformation?: FieldTransformation;
   confidence: number;
+  user_edited?: boolean;
 }
 
 export interface ExecutionPlan {
