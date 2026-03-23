@@ -10,7 +10,7 @@ import { APISpecForm } from "@/components/APISpecForm";
 import { DataContractDisplay } from "@/components/DataContractDisplay";
 import { TransformTab } from "@/components/TransformTab";
 import type { SourceContract, DataContract } from "@/types/contract";
-import { API_BASE } from "@/lib/constants";
+import { DATA_INGESTION_API_URL } from "@/lib/constants";
 
 type Tab = "csv" | "json" | "excel" | "api" | "destination" | "supabase" | "transform";
 
@@ -34,7 +34,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${API_BASE}/api/v1/analyze`, {
+      const response = await fetch(`${DATA_INGESTION_API_URL}/api/v1/analyze`, {
         method: "POST",
         body: formData,
       });
@@ -60,7 +60,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${API_BASE}/api/v1/analyze-json`, {
+      const response = await fetch(`${DATA_INGESTION_API_URL}/api/v1/analyze-json`, {
         method: "POST",
         body: formData,
       });
@@ -87,7 +87,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${API_BASE}/api/v1/analyze-excel`, {
+      const response = await fetch(`${DATA_INGESTION_API_URL}/api/v1/analyze-excel`, {
         method: "POST",
         body: formData,
       });
@@ -111,7 +111,7 @@ export default function Home() {
     setApiContract(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/analyze-api`, {
+      const response = await fetch(`${DATA_INGESTION_API_URL}/api/v1/analyze-api`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ spec_url: specURL }),
@@ -136,7 +136,7 @@ export default function Home() {
     setDbContract(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/analyze-destination`, {
+      const response = await fetch(`${DATA_INGESTION_API_URL}/api/v1/analyze-destination`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connection_string: connectionString, schema }),
@@ -161,7 +161,7 @@ export default function Home() {
     setSupaContract(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/analyze-supabase`, {
+      const response = await fetch(`${DATA_INGESTION_API_URL}/api/v1/analyze-supabase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_url: projectURL, api_key: apiKey }),

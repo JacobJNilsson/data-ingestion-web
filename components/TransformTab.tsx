@@ -10,7 +10,7 @@ import type { MappingRow, NamedSourceGroup } from "@/components/MappingEditor";
 import { LLMSettings } from "@/components/LLMSettings";
 import type { LLMConfig } from "@/components/LLMSettings";
 import { RawJSON } from "@/components/RawJSON";
-import { API_BASE } from "@/lib/constants";
+import { DATA_INGESTION_API_URL } from "@/lib/constants";
 import type {
   SourceContract,
   DataContract,
@@ -211,7 +211,7 @@ export function TransformTab() {
 
       const destFields = extractAPIFields(activeEntry.contract!, schemaIndex);
 
-      const resp = await fetch(`${API_BASE}/api/v1/suggest-mappings-multi`, {
+      const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/suggest-mappings-multi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -260,7 +260,7 @@ export function TransformTab() {
       const destContracts: Record<string, unknown> = {};
       destContracts[activeTab.label] = extractSchemaContract(activeEntry.contract, schemaIndex);
 
-      const resp = await fetch(`${API_BASE}/api/v1/ai-suggest-mappings`, {
+      const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/ai-suggest-mappings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -326,7 +326,7 @@ export function TransformTab() {
         }
       }
 
-      const resp = await fetch(`${API_BASE}/api/v1/verify-transformation`, {
+      const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/verify-transformation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transformation: transformContract, sources: sourcesMap, destinations: destsMap }),

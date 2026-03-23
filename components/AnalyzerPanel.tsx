@@ -7,7 +7,7 @@ import { PostgresForm } from "@/components/PostgresForm";
 import { SupabaseForm } from "@/components/SupabaseForm";
 import { APISpecForm } from "@/components/APISpecForm";
 import { CompactSummary } from "@/components/CompactSummary";
-import { API_BASE } from "@/lib/constants";
+import { DATA_INGESTION_API_URL } from "@/lib/constants";
 import type { SourceContract, DataContract } from "@/types/contract";
 
 export type AnalyzerType = "csv" | "json" | "excel" | "api" | "postgresql" | "supabase";
@@ -37,7 +37,7 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndices, onContra
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const resp = await fetch(`${API_BASE}${endpoint}`, { method: "POST", body: formData });
+      const resp = await fetch(`${DATA_INGESTION_API_URL}${endpoint}`, { method: "POST", body: formData });
       if (!resp.ok) {
         const body = await resp.json().catch(() => null);
         throw new Error(body?.error || `API error: ${resp.status}`);
@@ -54,7 +54,7 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndices, onContra
     setLoading(true);
     setPanelError("");
     try {
-      const resp = await fetch(`${API_BASE}${endpoint}`, {
+      const resp = await fetch(`${DATA_INGESTION_API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
