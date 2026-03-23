@@ -15,12 +15,12 @@ export type AnalyzerType = "csv" | "json" | "excel" | "api" | "postgresql" | "su
 interface AnalyzerPanelProps {
   label: string;
   contract: SourceContract | DataContract | null;
-  selectedSchemaIndex: number;
+  selectedSchemaIndices: number[];
   onContractChange: (contract: SourceContract | DataContract | null) => void;
-  onSchemaSelect: (index: number) => void;
+  onSchemaToggle: (index: number) => void;
 }
 
-export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContractChange, onSchemaSelect }: AnalyzerPanelProps) {
+export function AnalyzerPanel({ label, contract, selectedSchemaIndices, onContractChange, onSchemaToggle }: AnalyzerPanelProps) {
   const [type, setType] = useState<AnalyzerType>("csv");
   const [loading, setLoading] = useState(false);
   const [panelError, setPanelError] = useState("");
@@ -70,6 +70,10 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContract
       setLoading(false);
     }
   };
+
+  const isMultiSchema = contract && "schemas" in contract && "id" in contract
+    && (contract as DataContract).schemas.length > 1;
+  const schemas = isMultiSchema ? (contract as DataContract).schemas : null;
 
   const selectId = `${label.toLowerCase()}-type-select`;
 
@@ -143,36 +147,57 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndex, onContract
               Clear
             </button>
           </div>
-          {/* Schema selector for multi-schema contracts */}
-          {"schemas" in contract && "id" in contract && (contract as DataContract).schemas.length > 1 && (
+
+          {/* Schema checkboxes for multi-schema contracts */}
+          {schemas && (
             <div className="mb-3">
-              <label
-                htmlFor={`${label.toLowerCase()}-schema-select`}
-                className="block text-xs mb-1"
+              <p
+                className="text-xs mb-2"
                 style={{ color: "oklch(50% 0.01 80)" }}
               >
-                Select schema to map
-              </label>
-              <select
-                id={`${label.toLowerCase()}-schema-select`}
-                value={selectedSchemaIndex}
-                onChange={(e) => onSchemaSelect(parseInt(e.target.value, 10))}
-                className="w-full px-3 py-1.5 border rounded text-sm font-mono"
-                style={{
-                  borderColor: "oklch(85% 0.005 80)",
-                  color: "oklch(30% 0.01 80)",
-                  backgroundColor: "oklch(100% 0 0)",
-                }}
-              >
-                {(contract as DataContract).schemas.map((s, i) => (
-                  <option key={i} value={i}>
-                    {s.name} ({s.fields.length} fields)
-                  </option>
-                ))}
-              </select>
+                Select schemas to use
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {schemas.map((s, i) => {
+                  const checked = selectedSchemaIndices.includes(i);
+                  return (
+                    <label
+                      key={i}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors text-sm"
+                      style={{
+                        backgroundColor: checked ? "oklch(95% 0.02 260)" : "transparent",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onSchemaToggle(i)}
+                        className="rounded"
+                      />
+                      <span
+                        className="font-mono text-xs"
+                        style={{ color: "oklch(25% 0.01 80)" }}
+                      >
+                        {s.name}
+                      </span>
+                      <span
+                        className="text-xs"
+                        style={{ color: "oklch(55% 0.01 80)" }}
+                      >
+                        ({s.fields.length} fields)
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           )}
-          <CompactSummary contract={contract} selectedSchemaIndex={selectedSchemaIndex} />
+
+          {/* Summary: show the first selected schema */}
+          <CompactSummary
+            contract={contract}
+            selectedSchemaIndex={selectedSchemaIndices[0] ?? 0}
+          />
         </div>
       ) : (
         <div>

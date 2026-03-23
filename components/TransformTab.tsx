@@ -26,18 +26,27 @@ let nextMappingId = 1;
 
 function newSourceEntry(): SourceEntry {
   const id = `s${nextId++}`;
-  return { id, label: `Source ${id}`, contract: null, schemaIndex: 0 };
+  return { id, label: `Source ${id}`, contract: null, selectedSchemaIndices: [] };
 }
 
 function newDestEntry(): DestEntry {
   const id = `d${nextId++}`;
-  return { id, label: `Destination ${id}`, contract: null, schemaIndex: 0, mappings: [], verifyResult: null };
+  return { id, label: `Destination ${id}`, contract: null, selectedSchemaIndices: [], mappingsBySchema: {}, verifyResultBySchema: {} };
+}
+
+// A destination tab represents one checked schema from one destination entry.
+interface DestTab {
+  key: string;           // unique key: "entryId:schemaIndex"
+  entryId: string;
+  schemaIndex: number;
+  label: string;         // "entryLabel.schemaName" or just "entryLabel"
+  fields: DestinationField[];
 }
 
 export function TransformTab() {
   const [sources, setSources] = useState<SourceEntry[]>([newSourceEntry()]);
   const [destinations, setDestinations] = useState<DestEntry[]>([newDestEntry()]);
-  const [activeDestTab, setActiveDestTab] = useState<string>("");
+  const [activeDestTabKey, setActiveDestTabKey] = useState<string>("");
   const [generating, setGenerating] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -48,22 +57,54 @@ export function TransformTab() {
     apiKey: "",
   });
 
-  // Ensure activeDestTab is valid.
-  const activeDest = destinations.find((d) => d.id === activeDestTab) ?? destinations[0];
-  const activeDestId = activeDest?.id ?? "";
+  // --- Derive destination tabs from all checked schemas across all dest entries ---
+  const destTabs: DestTab[] = [];
+  for (const d of destinations) {
+    if (!d.contract) continue;
+    for (const idx of d.selectedSchemaIndices) {
+      const schemaName = getSchemaName(d.contract, idx);
+      const tabLabel = schemaName ? `${d.label}.${schemaName}` : d.label;
+      destTabs.push({
+        key: `${d.id}:${idx}`,
+        entryId: d.id,
+        schemaIndex: idx,
+        label: tabLabel,
+        fields: extractDestFields(d.contract, idx),
+      });
+    }
+  }
+
+  // Active tab: find by key, fall back to first.
+  const activeTab = destTabs.find((t) => t.key === activeDestTabKey) ?? destTabs[0] ?? null;
+  const activeTabKey = activeTab?.key ?? "";
+
+  // Get mappings/verifyResult for active tab.
+  const activeEntry = activeTab ? destinations.find((d) => d.id === activeTab.entryId) : null;
+  const activeMappings = activeEntry?.mappingsBySchema[activeTab?.schemaIndex ?? 0] ?? [];
+  const activeVerifyResult = activeEntry?.verifyResultBySchema[activeTab?.schemaIndex ?? 0] ?? null;
 
   // --- Source handlers ---
   const handleSourceChange = useCallback((id: string, contract: SourceContract | DataContract | null) => {
-    setSources((prev) => prev.map((s) => s.id === id
-      ? { ...s, contract, schemaIndex: 0, label: contract ? deriveLabel(contract, s.label) : s.label }
-      : s
-    ));
-    setDestinations((prev) => prev.map((d) => ({ ...d, mappings: [], verifyResult: null })));
+    setSources((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      // Auto-select first schema (or only schema for single-schema contracts).
+      const indices = contract ? [0] : [];
+      return { ...s, contract, selectedSchemaIndices: indices, label: contract ? deriveLabel(contract, s.label) : s.label };
+    }));
+    setDestinations((prev) => prev.map((d) => ({ ...d, mappingsBySchema: {}, verifyResultBySchema: {} })));
   }, []);
 
-  const handleSourceSchemaSelect = useCallback((id: string, index: number) => {
-    setSources((prev) => prev.map((s) => s.id === id ? { ...s, schemaIndex: index } : s));
-    setDestinations((prev) => prev.map((d) => ({ ...d, mappings: [], verifyResult: null })));
+  const handleSourceSchemaToggle = useCallback((id: string, index: number) => {
+    setSources((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      const indices = s.selectedSchemaIndices.includes(index)
+        ? s.selectedSchemaIndices.filter((i) => i !== index)
+        : [...s.selectedSchemaIndices, index].sort();
+      // Don't allow deselecting all -- keep at least one.
+      if (indices.length === 0) return s;
+      return { ...s, selectedSchemaIndices: indices };
+    }));
+    setDestinations((prev) => prev.map((d) => ({ ...d, mappingsBySchema: {}, verifyResultBySchema: {} })));
   }, []);
 
   const handleSourceLabelChange = useCallback((id: string, label: string) => {
@@ -79,19 +120,36 @@ export function TransformTab() {
       const filtered = prev.filter((s) => s.id !== id);
       return filtered.length > 0 ? filtered : prev;
     });
-    setDestinations((prev) => prev.map((d) => ({ ...d, mappings: [], verifyResult: null })));
+    setDestinations((prev) => prev.map((d) => ({ ...d, mappingsBySchema: {}, verifyResultBySchema: {} })));
   }, []);
 
   // --- Destination handlers ---
   const handleDestChange = useCallback((id: string, contract: SourceContract | DataContract | null) => {
-    setDestinations((prev) => prev.map((d) => d.id === id
-      ? { ...d, contract, schemaIndex: 0, label: contract ? deriveLabel(contract, d.label) : d.label, mappings: [], verifyResult: null }
-      : d
-    ));
+    setDestinations((prev) => prev.map((d) => {
+      if (d.id !== id) return d;
+      const indices = contract ? [0] : [];
+      return { ...d, contract, selectedSchemaIndices: indices, label: contract ? deriveLabel(contract, d.label) : d.label, mappingsBySchema: {}, verifyResultBySchema: {} };
+    }));
   }, []);
 
-  const handleDestSchemaSelect = useCallback((id: string, index: number) => {
-    setDestinations((prev) => prev.map((d) => d.id === id ? { ...d, schemaIndex: index, mappings: [], verifyResult: null } : d));
+  const handleDestSchemaToggle = useCallback((id: string, index: number) => {
+    setDestinations((prev) => prev.map((d) => {
+      if (d.id !== id) return d;
+      const indices = d.selectedSchemaIndices.includes(index)
+        ? d.selectedSchemaIndices.filter((i) => i !== index)
+        : [...d.selectedSchemaIndices, index].sort();
+      if (indices.length === 0) return d;
+      // Remove mappings for deselected schemas.
+      const newMappings = { ...d.mappingsBySchema };
+      const newVerify = { ...d.verifyResultBySchema };
+      for (const key of Object.keys(newMappings)) {
+        if (!indices.includes(Number(key))) {
+          delete newMappings[Number(key)];
+          delete newVerify[Number(key)];
+        }
+      }
+      return { ...d, selectedSchemaIndices: indices, mappingsBySchema: newMappings, verifyResultBySchema: newVerify };
+    }));
   }, []);
 
   const handleDestLabelChange = useCallback((id: string, label: string) => {
@@ -101,7 +159,6 @@ export function TransformTab() {
   const handleAddDest = useCallback(() => {
     const entry = newDestEntry();
     setDestinations((prev) => [...prev, entry]);
-    setActiveDestTab(entry.id);
   }, []);
 
   const handleRemoveDest = useCallback((id: string) => {
@@ -110,55 +167,55 @@ export function TransformTab() {
       if (filtered.length === 0) return prev;
       return filtered;
     });
-    // Reset active tab if needed -- use a separate setState to avoid
-    // batching issues inside the updater.
-    if (activeDestTab === id) {
-      setDestinations((prev) => {
-        if (prev.length > 0) setActiveDestTab(prev[0].id);
-        return prev;
-      });
-    }
-  }, [activeDestTab]);
+  }, []);
 
-  const handleMappingsChange = useCallback((destId: string, newMappings: FieldMapping[]) => {
+  const handleMappingsChange = useCallback((entryId: string, schemaIndex: number, newMappings: FieldMapping[]) => {
     setDestinations((prev) => prev.map((d) =>
-      d.id === destId ? { ...d, mappings: newMappings, verifyResult: null } : d
+      d.id === entryId
+        ? { ...d, mappingsBySchema: { ...d.mappingsBySchema, [schemaIndex]: newMappings }, verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: null } }
+        : d
     ));
   }, []);
 
-  // --- Derived data ---
-  const sourceGroups: NamedSourceGroup[] = sources
-    .filter((s) => s.contract)
-    .map((s) => ({
-      ref: s.label,
-      fieldNames: extractFieldNames(s.contract!, s.schemaIndex),
-    }));
+  // --- Derived source groups: flatten checked schemas across all source entries ---
+  const sourceGroups: NamedSourceGroup[] = [];
+  for (const s of sources) {
+    if (!s.contract) continue;
+    for (const idx of s.selectedSchemaIndices) {
+      const ref = schemaRef(s, idx);
+      sourceGroups.push({
+        ref,
+        fieldNames: extractFieldNames(s.contract, idx),
+      });
+    }
+  }
 
-  const activeDestFields = activeDest ? extractDestFields(activeDest.contract, activeDest.schemaIndex) : [];
-  const canGenerate = sourceGroups.length > 0 && activeDestFields.length > 0;
+  const canGenerate = sourceGroups.length > 0 && (activeTab?.fields.length ?? 0) > 0;
   const canAISuggest = canGenerate && llmConfig.apiKey.trim().length > 0;
 
   // --- Generate (deterministic) ---
   const handleGenerate = async () => {
-    if (!activeDest) return;
-    const targetDestId = activeDest.id;
+    if (!activeTab || !activeEntry) return;
+    const { entryId, schemaIndex } = activeTab;
     setGenerating(true);
     setError("");
     try {
-      const apiSources = sources
-        .filter((s) => s.contract)
-        .map((s) => ({
-          ref: s.label,
-          fields: extractAPIFields(s.contract!, s.schemaIndex),
-        }));
+      // Build source fields with types.
+      const properSources: { ref: string; fields: { Name: string; DataType: string; Nullable?: boolean }[] }[] = [];
+      for (const s of sources) {
+        if (!s.contract) continue;
+        for (const idx of s.selectedSchemaIndices) {
+          properSources.push({ ref: schemaRef(s, idx), fields: extractAPIFields(s.contract, idx) });
+        }
+      }
 
-      const destFields = extractAPIFields(activeDest.contract!, activeDest.schemaIndex);
+      const destFields = extractAPIFields(activeEntry.contract!, schemaIndex);
 
       const resp = await fetch(`${API_BASE}/api/v1/suggest-mappings-multi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sources: apiSources,
+          sources: properSources,
           destination_fields: destFields,
         }),
       });
@@ -174,7 +231,7 @@ export function TransformTab() {
         confidence: m.confidence ?? 0,
         user_edited: false,
       }));
-      handleMappingsChange(targetDestId, generated);
+      handleMappingsChange(entryId, schemaIndex, generated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate mappings");
     } finally {
@@ -184,20 +241,23 @@ export function TransformTab() {
 
   // --- AI Suggest ---
   const handleAISuggest = async () => {
-    if (!activeDest || !activeDest.contract) return;
-    const targetDestId = activeDest.id;
-    const currentMappings = activeDest.mappings;
+    if (!activeTab || !activeEntry?.contract) return;
+    const { entryId, schemaIndex } = activeTab;
+    const currentMappings = activeMappings;
     setAiLoading(true);
     setError("");
     try {
+      // Build source contracts map.
       const sourceContracts: Record<string, unknown> = {};
       for (const s of sources) {
-        if (s.contract) {
-          sourceContracts[s.label] = extractSchemaContract(s.contract, s.schemaIndex);
+        if (!s.contract) continue;
+        for (const idx of s.selectedSchemaIndices) {
+          sourceContracts[schemaRef(s, idx)] = extractSchemaContract(s.contract, idx);
         }
       }
+
       const destContracts: Record<string, unknown> = {};
-      destContracts[activeDest.label] = extractSchemaContract(activeDest.contract, activeDest.schemaIndex);
+      destContracts[activeTab.label] = extractSchemaContract(activeEntry.contract, schemaIndex);
 
       const resp = await fetch(`${API_BASE}/api/v1/ai-suggest-mappings`, {
         method: "POST",
@@ -221,25 +281,19 @@ export function TransformTab() {
       const userEditedMap = new Map(
         (currentMappings as MappingRow[]).filter((m) => m.user_edited).map((m) => [m.destination_field, m])
       );
-
       const aiMappings: FieldMapping[] = data.mappings || [];
       const aiDestFields = new Set(aiMappings.map((m: FieldMapping) => m.destination_field));
-
       const merged: MappingRow[] = aiMappings.map((m: FieldMapping) => {
         const userEdited = userEditedMap.get(m.destination_field);
-        if (userEdited) {
-          return { ...userEdited, _id: userEdited._id ?? nextMappingId++ };
-        }
+        if (userEdited) return { ...userEdited, _id: userEdited._id ?? nextMappingId++ };
         return { ...m, source_type: m.source_type || "unmapped", _id: nextMappingId++, confidence: m.confidence ?? 0, user_edited: false };
       });
-
       for (const [destField, userEdited] of userEditedMap) {
         if (!aiDestFields.has(destField)) {
           merged.push({ ...userEdited, _id: userEdited._id ?? nextMappingId++ });
         }
       }
-
-      handleMappingsChange(targetDestId, merged);
+      handleMappingsChange(entryId, schemaIndex, merged);
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI suggestion failed");
     } finally {
@@ -249,8 +303,8 @@ export function TransformTab() {
 
   // --- Verify ---
   const handleVerify = async () => {
-    if (!activeDest) return;
-    const targetDestId = activeDest.id;
+    if (!activeTab || !activeEntry) return;
+    const { entryId, schemaIndex } = activeTab;
     setVerifying(true);
     setError("");
     try {
@@ -258,25 +312,23 @@ export function TransformTab() {
 
       const sourcesMap: Record<string, unknown> = {};
       for (const s of sources) {
-        if (s.contract) {
-          sourcesMap[s.label] = extractSchemaContract(s.contract, s.schemaIndex);
+        if (!s.contract) continue;
+        for (const idx of s.selectedSchemaIndices) {
+          sourcesMap[schemaRef(s, idx)] = extractSchemaContract(s.contract, idx);
         }
       }
       const destsMap: Record<string, unknown> = {};
       for (const d of destinations) {
-        if (d.contract) {
-          destsMap[d.label] = extractSchemaContract(d.contract, d.schemaIndex);
+        if (!d.contract) continue;
+        for (const idx of d.selectedSchemaIndices) {
+          destsMap[schemaRef(d, idx)] = extractSchemaContract(d.contract, idx);
         }
       }
 
       const resp = await fetch(`${API_BASE}/api/v1/verify-transformation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transformation: transformContract,
-          sources: sourcesMap,
-          destinations: destsMap,
-        }),
+        body: JSON.stringify({ transformation: transformContract, sources: sourcesMap, destinations: destsMap }),
       });
       if (!resp.ok) {
         const body = await resp.json().catch(() => null);
@@ -284,7 +336,9 @@ export function TransformTab() {
       }
       const result: VerifyResult = await resp.json();
       setDestinations((prev) => prev.map((d) =>
-        d.id === targetDestId ? { ...d, verifyResult: result } : d
+        d.id === entryId
+          ? { ...d, verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: result } }
+          : d
       ));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
@@ -294,8 +348,8 @@ export function TransformTab() {
   };
 
   const loading = generating || verifying;
-  const transformContract = destinations.some((d) => d.mappings.length > 0)
-    ? buildTransformContract(sources, destinations) : null;
+  const hasAnyMappings = destinations.some((d) => Object.values(d.mappingsBySchema).some((m) => m.length > 0));
+  const transformContract = hasAnyMappings ? buildTransformContract(sources, destinations) : null;
 
   return (
     <div className="space-y-8">
@@ -304,7 +358,7 @@ export function TransformTab() {
         <SourceList
           sources={sources}
           onSourceChange={handleSourceChange}
-          onSchemaSelect={handleSourceSchemaSelect}
+          onSchemaToggle={handleSourceSchemaToggle}
           onLabelChange={handleSourceLabelChange}
           onAdd={handleAddSource}
           onRemove={handleRemoveSource}
@@ -312,7 +366,7 @@ export function TransformTab() {
         <DestinationList
           destinations={destinations}
           onDestChange={handleDestChange}
-          onSchemaSelect={handleDestSchemaSelect}
+          onSchemaToggle={handleDestSchemaToggle}
           onLabelChange={handleDestLabelChange}
           onAdd={handleAddDest}
           onRemove={handleRemoveDest}
@@ -322,38 +376,42 @@ export function TransformTab() {
       {/* LLM Settings */}
       <LLMSettings config={llmConfig} onChange={setLlmConfig} />
 
-      {/* Destination tabs (only when multiple destinations) */}
-      {destinations.length > 1 && (
-        <div className="flex gap-1 border-b" style={{ borderColor: "oklch(90% 0.005 80)" }}>
-          {destinations.map((d) => (
+      {/* Destination tabs (only when multiple dest schemas selected) */}
+      {destTabs.length > 1 && (
+        <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "oklch(90% 0.005 80)" }}>
+          {destTabs.map((tab) => (
             <button
-              key={d.id}
+              key={tab.key}
               type="button"
-              onClick={() => setActiveDestTab(d.id)}
-              className="px-4 py-2 text-xs font-semibold transition-all rounded-t-lg"
+              onClick={() => setActiveDestTabKey(tab.key)}
+              className="px-4 py-2 text-xs font-semibold transition-all rounded-t-lg whitespace-nowrap"
               style={{
-                backgroundColor: d.id === activeDestId ? "oklch(100% 0 0)" : "transparent",
-                color: d.id === activeDestId ? "oklch(25% 0.01 80)" : "oklch(55% 0.01 80)",
-                borderBottom: d.id === activeDestId ? "2px solid oklch(35% 0.05 260)" : "2px solid transparent",
+                backgroundColor: tab.key === activeTabKey ? "oklch(100% 0 0)" : "transparent",
+                color: tab.key === activeTabKey ? "oklch(25% 0.01 80)" : "oklch(55% 0.01 80)",
+                borderBottom: tab.key === activeTabKey ? "2px solid oklch(35% 0.05 260)" : "2px solid transparent",
               }}
             >
-              {d.label} ({extractDestFields(d.contract, d.schemaIndex).length})
+              {tab.label} ({tab.fields.length})
             </button>
           ))}
         </div>
       )}
 
-      {/* Mapping editor for active destination */}
-      {activeDest && (
+      {/* Mapping editor for active destination tab */}
+      {/* Mapping editor for active destination tab.
+          The onMappingsChange closure captures activeTab from the render scope.
+          This is safe because React re-renders synchronously on tab switch,
+          so the closure is always fresh before the next user interaction. */}
+      {activeTab && (
         <MappingEditor
-          mappings={activeDest.mappings}
+          mappings={activeMappings}
           sourceGroups={sourceGroups}
-          destFields={activeDestFields}
-          onMappingsChange={(m) => handleMappingsChange(activeDestId, m)}
+          destFields={activeTab.fields}
+          onMappingsChange={(m) => handleMappingsChange(activeTab.entryId, activeTab.schemaIndex, m)}
           onGenerate={handleGenerate}
           onAISuggest={handleAISuggest}
           onVerify={handleVerify}
-          verifyResult={activeDest.verifyResult}
+          verifyResult={activeVerifyResult}
           loading={loading}
           canGenerate={canGenerate}
           canAISuggest={canAISuggest}
@@ -444,27 +502,55 @@ function deriveLabel(contract: SourceContract | DataContract, fallback: string):
   return sc.source_format || fallback;
 }
 
-function buildTransformContract(sources: SourceEntry[], destinations: DestEntry[]): TransformContract {
-  const sourceRefs = sources.filter((s) => s.contract).map((s) => s.label);
-  const destRefs = destinations.filter((d) => d.contract).map((d) => d.label);
+// Get a specific schema's name from a contract, or null if single-schema.
+function getSchemaName(contract: SourceContract | DataContract, schemaIndex: number): string | null {
+  if (!isDataContract(contract) || contract.schemas.length <= 1) return null;
+  return contract.schemas[schemaIndex]?.name ?? `schema_${schemaIndex}`;
+}
 
-  const mappingGroups: MappingGroup[] = destinations
-    .filter((d) => d.mappings.length > 0)
-    .map((d) => ({
-      destination_ref: d.label,
-      field_mappings: d.mappings.map((m) => ({
-        destination_field: m.destination_field,
-        source_type: m.source_type || "unmapped",
-        source_ref: m.source_type === "field" ? m.source_ref : undefined,
-        source_field: m.source_type === "field" ? m.source_field : undefined,
-        source_constant: m.source_type === "constant" ? m.source_constant : undefined,
-        source_fields: m.source_type === "transform" ? m.source_fields : undefined,
-        transform_description: m.source_type === "transform" ? m.transform_description : undefined,
-        transformation: m.transformation,
-        confidence: m.confidence,
-        user_edited: m.user_edited,
-      })),
-    }));
+// Build the ref label for a specific schema within an entry.
+function schemaRef(entry: { label: string; contract: SourceContract | DataContract | null }, schemaIndex: number): string {
+  if (!entry.contract) return entry.label;
+  const name = getSchemaName(entry.contract, schemaIndex);
+  return name ? `${entry.label}.${name}` : entry.label;
+}
+
+function buildTransformContract(sources: SourceEntry[], destinations: DestEntry[]): TransformContract {
+  const sourceRefs: string[] = [];
+  for (const s of sources) {
+    if (!s.contract) continue;
+    for (const idx of s.selectedSchemaIndices) {
+      sourceRefs.push(schemaRef(s, idx));
+    }
+  }
+
+  const destRefs: string[] = [];
+  const mappingGroups: MappingGroup[] = [];
+  for (const d of destinations) {
+    if (!d.contract) continue;
+    for (const idx of d.selectedSchemaIndices) {
+      const ref = schemaRef(d, idx);
+      destRefs.push(ref);
+      const mappings = d.mappingsBySchema[idx] ?? [];
+      if (mappings.length > 0) {
+        mappingGroups.push({
+          destination_ref: ref,
+          field_mappings: mappings.map((m) => ({
+            destination_field: m.destination_field,
+            source_type: m.source_type || "unmapped",
+            source_ref: m.source_type === "field" ? m.source_ref : undefined,
+            source_field: m.source_type === "field" ? m.source_field : undefined,
+            source_constant: m.source_type === "constant" ? m.source_constant : undefined,
+            source_fields: m.source_type === "transform" ? m.source_fields : undefined,
+            transform_description: m.source_type === "transform" ? m.transform_description : undefined,
+            transformation: m.transformation,
+            confidence: m.confidence,
+            user_edited: m.user_edited,
+          })),
+        });
+      }
+    }
+  }
 
   return {
     contract_type: "transformation",
@@ -472,10 +558,6 @@ function buildTransformContract(sources: SourceEntry[], destinations: DestEntry[
     source_refs: sourceRefs,
     destination_refs: destRefs,
     mapping_groups: mappingGroups,
-    execution_plan: {
-      batch_size: 100,
-      error_threshold: 0.1,
-      validation_enabled: true,
-    },
+    execution_plan: { batch_size: 100, error_threshold: 0.1, validation_enabled: true },
   };
 }
