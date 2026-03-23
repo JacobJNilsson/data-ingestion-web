@@ -7,13 +7,13 @@ export interface SourceEntry {
   id: string;
   label: string;
   contract: SourceContract | DataContract | null;
-  schemaIndex: number;
+  selectedSchemaIndices: number[];
 }
 
 interface SourceListProps {
   sources: SourceEntry[];
   onSourceChange: (id: string, contract: SourceContract | DataContract | null) => void;
-  onSchemaSelect: (id: string, index: number) => void;
+  onSchemaToggle: (id: string, index: number) => void;
   onLabelChange: (id: string, label: string) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
@@ -22,7 +22,7 @@ interface SourceListProps {
 export function SourceList({
   sources,
   onSourceChange,
-  onSchemaSelect,
+  onSchemaToggle,
   onLabelChange,
   onAdd,
   onRemove,
@@ -86,9 +86,9 @@ export function SourceList({
             <AnalyzerPanel
               label={`source-${source.id}`}
               contract={source.contract}
-              selectedSchemaIndex={source.schemaIndex}
+              selectedSchemaIndices={source.selectedSchemaIndices}
               onContractChange={(c) => onSourceChange(source.id, c)}
-              onSchemaSelect={(idx) => onSchemaSelect(source.id, idx)}
+              onSchemaToggle={(idx) => onSchemaToggle(source.id, idx)}
             />
           </div>
         ))}

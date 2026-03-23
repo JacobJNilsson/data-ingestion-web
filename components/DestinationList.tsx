@@ -7,15 +7,16 @@ export interface DestEntry {
   id: string;
   label: string;
   contract: SourceContract | DataContract | null;
-  schemaIndex: number;
-  mappings: FieldMapping[];
-  verifyResult: VerifyResult | null;
+  selectedSchemaIndices: number[];
+  // Mappings and verify results keyed by schema index.
+  mappingsBySchema: Record<number, FieldMapping[]>;
+  verifyResultBySchema: Record<number, VerifyResult | null>;
 }
 
 interface DestinationListProps {
   destinations: DestEntry[];
   onDestChange: (id: string, contract: SourceContract | DataContract | null) => void;
-  onSchemaSelect: (id: string, index: number) => void;
+  onSchemaToggle: (id: string, index: number) => void;
   onLabelChange: (id: string, label: string) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
@@ -24,7 +25,7 @@ interface DestinationListProps {
 export function DestinationList({
   destinations,
   onDestChange,
-  onSchemaSelect,
+  onSchemaToggle,
   onLabelChange,
   onAdd,
   onRemove,
@@ -88,9 +89,9 @@ export function DestinationList({
             <AnalyzerPanel
               label={`dest-${dest.id}`}
               contract={dest.contract}
-              selectedSchemaIndex={dest.schemaIndex}
+              selectedSchemaIndices={dest.selectedSchemaIndices}
               onContractChange={(c) => onDestChange(dest.id, c)}
-              onSchemaSelect={(idx) => onSchemaSelect(dest.id, idx)}
+              onSchemaToggle={(idx) => onSchemaToggle(dest.id, idx)}
             />
           </div>
         ))}
