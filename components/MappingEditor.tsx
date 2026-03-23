@@ -238,7 +238,7 @@ export function MappingEditor({
                               <optgroup key={group.ref} label={group.ref}>
                                 {group.fieldNames.map((name) => (
                                   <option key={`${group.ref}${REF_DELIM}${name}`} value={`${group.ref}${REF_DELIM}${name}`}>
-                                    {name}
+                                    {group.ref}: {name}
                                   </option>
                                 ))}
                               </optgroup>
