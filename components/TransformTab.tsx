@@ -209,13 +209,24 @@ export function TransformTab() {
         }
       }
 
+      // Reorder sources: put the source whose ref matches the destination's
+      // schema name first. This makes the "first wins" matching heuristic
+      // prefer same-schema fields (e.g., source "mydb.orders" matches first
+      // for destination "mydb.orders").
+      const destRef = activeTab.label;
+      const sortedSources = [...properSources].sort((a, b) => {
+        const aMatch = a.ref === destRef ? 0 : 1;
+        const bMatch = b.ref === destRef ? 0 : 1;
+        return aMatch - bMatch;
+      });
+
       const destFields = extractAPIFields(activeEntry.contract!, schemaIndex);
 
       const resp = await fetch(`${API_BASE}/api/v1/suggest-mappings-multi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sources: properSources,
+          sources: sortedSources,
           destination_fields: destFields,
         }),
       });
