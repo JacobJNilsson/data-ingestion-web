@@ -209,14 +209,16 @@ export function TransformTab() {
         }
       }
 
-      // Reorder sources: put the source whose ref matches the destination's
-      // schema name first. This makes the "first wins" matching heuristic
-      // prefer same-schema fields (e.g., source "mydb.orders" matches first
-      // for destination "mydb.orders").
-      const destRef = activeTab.label;
+      // Reorder sources: prefer the source whose schema name matches the
+      // destination's schema name. Compare the part after the last "." in
+      // the ref (e.g., "Source s1.orders" → "orders" matches "Dest d1.orders"
+      // → "orders"). This makes the "first wins" matching heuristic prefer
+      // same-schema fields when sources and destinations share schema names
+      // across different connections.
+      const destSchemaName = schemaNameFromRef(activeTab.label);
       const sortedSources = [...properSources].sort((a, b) => {
-        const aMatch = a.ref === destRef ? 0 : 1;
-        const bMatch = b.ref === destRef ? 0 : 1;
+        const aMatch = schemaNameFromRef(a.ref) === destSchemaName ? 0 : 1;
+        const bMatch = schemaNameFromRef(b.ref) === destSchemaName ? 0 : 1;
         return aMatch - bMatch;
       });
 
@@ -517,6 +519,14 @@ function deriveLabel(contract: SourceContract | DataContract, fallback: string):
 function getSchemaName(contract: SourceContract | DataContract, schemaIndex: number): string | null {
   if (!isDataContract(contract) || contract.schemas.length <= 1) return null;
   return contract.schemas[schemaIndex]?.name ?? `schema_${schemaIndex}`;
+}
+
+// Extract the schema name from a ref string. The ref is "label.schema" for
+// multi-schema or just "label" for single-schema. Returns the part after
+// the last "." or the full string if no dot.
+function schemaNameFromRef(ref: string): string {
+  const dot = ref.lastIndexOf(".");
+  return dot >= 0 ? ref.substring(dot + 1) : ref;
 }
 
 // Build the ref label for a specific schema within an entry.
