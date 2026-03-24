@@ -1,0 +1,6 @@
+order_id,customer_name,product,quantity,price
+1,Alice,Widget,3,9.99
+2,Bob,Gadget,1,24.50
+3,Charlie,Doohickey,5,4.75
+4,Diana,Widget,2,9.99
+5,Eve,Gadget,4,24.50
