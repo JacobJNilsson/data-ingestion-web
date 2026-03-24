@@ -318,6 +318,148 @@ export function TransformTab() {
     }
   };
 
+  // --- AI Build Pipeline (per destination) ---
+  const [aiBuildLoading, setAiBuildLoading] = useState(false);
+
+  const handleAIBuild = async () => {
+    if (!activeTab || !activeEntry?.contract) return;
+    const { entryId, schemaIndex } = activeTab;
+    setAiBuildLoading(true);
+    setError("");
+    try {
+      const sourceContracts: Record<string, unknown> = {};
+      for (const s of sources) {
+        if (!s.contract) continue;
+        for (const idx of s.selectedSchemaIndices) {
+          sourceContracts[schemaRef(s, idx)] = extractSchemaContract(s.contract, idx);
+        }
+      }
+      const destContracts: Record<string, unknown> = {};
+      destContracts[activeTab.label] = extractSchemaContract(activeEntry.contract, schemaIndex);
+
+      // Collect existing user-created steps.
+      const existingSteps = (activeEntry.stepsBySchema[schemaIndex] ?? [])
+        .filter((s) => s.user_created)
+        .map((s) => ({ ...s, user_created: true }));
+
+      const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/ai-pipeline-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: llmConfig.provider,
+          api_key: llmConfig.apiKey,
+          model: llmConfig.model,
+          source_contracts: sourceContracts,
+          destination_contracts: destContracts,
+          existing_steps_by_destination: existingSteps.length > 0
+            ? { [activeTab.label]: existingSteps }
+            : undefined,
+        }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => null);
+        throw new Error(body?.error || `API error: ${resp.status}`);
+      }
+      const data = await resp.json();
+      const stepsByDest = data.steps_by_destination as Record<string, DataFlowStep[]> | undefined;
+      const destSteps = stepsByDest?.[activeTab.label] ?? stepsByDest?.[Object.keys(stepsByDest || {})[0]] ?? [];
+
+      // Assign IDs and preserve user_created flags.
+      const newSteps: DataFlowStep[] = destSteps.map((s: DataFlowStep) => ({
+        ...s,
+        id: s.id || `step_${crypto.randomUUID().slice(0, 8)}`,
+        user_created: s.user_created ?? false,
+      }));
+
+      setDestinations((prev) => prev.map((d) => {
+        if (d.id !== entryId) return d;
+        return {
+          ...d,
+          stepsBySchema: { ...d.stepsBySchema, [schemaIndex]: newSteps },
+          verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: null },
+        };
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI Build failed");
+    } finally {
+      setAiBuildLoading(false);
+    }
+  };
+
+  // --- AI Build All (global, all destinations) ---
+  const handleAIBuildAll = async () => {
+    setAiBuildLoading(true);
+    setError("");
+    try {
+      const sourceContracts: Record<string, unknown> = {};
+      for (const s of sources) {
+        if (!s.contract) continue;
+        for (const idx of s.selectedSchemaIndices) {
+          sourceContracts[schemaRef(s, idx)] = extractSchemaContract(s.contract, idx);
+        }
+      }
+      const destContracts: Record<string, unknown> = {};
+      const existingStepsByDest: Record<string, DataFlowStep[]> = {};
+      for (const d of destinations) {
+        if (!d.contract) continue;
+        for (const idx of d.selectedSchemaIndices) {
+          const ref = schemaRef(d, idx);
+          destContracts[ref] = extractSchemaContract(d.contract, idx);
+          const existing = (d.stepsBySchema[idx] ?? []).filter((s) => s.user_created);
+          if (existing.length > 0) {
+            existingStepsByDest[ref] = existing;
+          }
+        }
+      }
+
+      if (Object.keys(sourceContracts).length === 0 || Object.keys(destContracts).length === 0) return;
+
+      const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/ai-pipeline-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: llmConfig.provider,
+          api_key: llmConfig.apiKey,
+          model: llmConfig.model,
+          source_contracts: sourceContracts,
+          destination_contracts: destContracts,
+          existing_steps_by_destination: Object.keys(existingStepsByDest).length > 0 ? existingStepsByDest : undefined,
+        }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => null);
+        throw new Error(body?.error || `API error: ${resp.status}`);
+      }
+      const data = await resp.json();
+      const stepsByDest = data.steps_by_destination as Record<string, DataFlowStep[]> | undefined;
+      if (!stepsByDest) return;
+
+      // Update each destination's steps.
+      setDestinations((prev) => prev.map((d) => {
+        if (!d.contract) return d;
+        const updated = { ...d };
+        for (const idx of d.selectedSchemaIndices) {
+          const ref = schemaRef(d, idx);
+          const destSteps = stepsByDest[ref];
+          if (destSteps) {
+            const newSteps: DataFlowStep[] = destSteps.map((s: DataFlowStep) => ({
+              ...s,
+              id: s.id || `step_${crypto.randomUUID().slice(0, 8)}`,
+              user_created: s.user_created ?? false,
+            }));
+            updated.stepsBySchema = { ...updated.stepsBySchema, [idx]: newSteps };
+            updated.verifyResultBySchema = { ...updated.verifyResultBySchema, [idx]: null };
+          }
+        }
+        return updated;
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI Build All failed");
+    } finally {
+      setAiBuildLoading(false);
+    }
+  };
+
   // --- Verify ---
   const handleVerify = async () => {
     if (!activeTab || !activeEntry) return;
@@ -393,6 +535,19 @@ export function TransformTab() {
       {/* LLM Settings */}
       <LLMSettings config={llmConfig} onChange={setLlmConfig} />
 
+      {/* AI Build All button (global) */}
+      {llmConfig.apiKey.trim().length > 0 && destTabs.length > 0 && sourceGroups.length > 0 && (
+        <button
+          type="button"
+          onClick={handleAIBuildAll}
+          disabled={aiBuildLoading || generating || aiLoading || verifying}
+          className="px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+          style={{ backgroundColor: "oklch(40% 0.08 280)", color: "oklch(98% 0.005 80)" }}
+        >
+          {aiBuildLoading ? "Building all pipelines..." : "AI Build All Pipelines"}
+        </button>
+      )}
+
       {/* Destination tabs (only when multiple dest schemas selected) */}
       {destTabs.length > 1 && (
         <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "oklch(90% 0.005 80)" }}>
@@ -423,10 +578,13 @@ export function TransformTab() {
           destFields={activeTab.fields}
           onGenerateMappings={handleGenerateMappings}
           onAISuggestMappings={handleAISuggestMappings}
+          onAIBuild={handleAIBuild}
           mappingLoading={generating}
           aiLoading={aiLoading}
+          aiBuildLoading={aiBuildLoading}
           canGenerate={canGenerate}
           canAISuggest={canAISuggest}
+          canAIBuild={canAISuggest}
           notes={activeNotes}
           onNotesChange={(text) => {
             if (!activeTab) return;
