@@ -129,11 +129,11 @@ export interface CaptureResponseConfig {
   fields: string[];
 }
 
-export interface DataFlowStep {
-  type: DataFlowStepType;
-  config: ManualLabelConfig | LLMClassifyConfig | LookupConfig | CaptureResponseConfig;
-  notes?: string;
-}
+export type DataFlowStep =
+  | { id: string; type: "manual_label"; config: ManualLabelConfig; notes?: string }
+  | { id: string; type: "llm_classify"; config: LLMClassifyConfig; notes?: string }
+  | { id: string; type: "lookup"; config: LookupConfig; notes?: string }
+  | { id: string; type: "capture_response"; config: CaptureResponseConfig; notes?: string };
 
 export interface MappingGroup {
   destination_ref: string;
