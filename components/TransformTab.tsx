@@ -31,7 +31,11 @@ function newSourceEntry(): SourceEntry {
 
 function newDestEntry(): DestEntry {
   const id = `d${nextId++}`;
-  return { id, label: `Destination ${id}`, contract: null, selectedSchemaIndices: [], mappingsBySchema: {}, verifyResultBySchema: {} };
+  return {
+    id, label: `Destination ${id}`, contract: null, selectedSchemaIndices: [],
+    mappingsBySchema: {}, verifyResultBySchema: {},
+    executionOrderBySchema: {}, preStepsBySchema: {}, postStepsBySchema: {}, notesBySchema: {},
+  };
 }
 
 // A destination tab represents one checked schema from one destination entry.
@@ -78,10 +82,11 @@ export function TransformTab() {
   const activeTab = destTabs.find((t) => t.key === activeDestTabKey) ?? destTabs[0] ?? null;
   const activeTabKey = activeTab?.key ?? "";
 
-  // Get mappings/verifyResult for active tab.
+  // Get mappings/verifyResult/dataflow state for active tab.
   const activeEntry = activeTab ? destinations.find((d) => d.id === activeTab.entryId) : null;
-  const activeMappings = activeEntry?.mappingsBySchema[activeTab?.schemaIndex ?? 0] ?? [];
-  const activeVerifyResult = activeEntry?.verifyResultBySchema[activeTab?.schemaIndex ?? 0] ?? null;
+  const activeSchemaIdx = activeTab?.schemaIndex ?? 0;
+  const activeMappings = activeEntry?.mappingsBySchema[activeSchemaIdx] ?? [];
+  const activeVerifyResult = activeEntry?.verifyResultBySchema[activeSchemaIdx] ?? null;
 
   // --- Source handlers ---
   const handleSourceChange = useCallback((id: string, contract: SourceContract | DataContract | null) => {
@@ -128,7 +133,11 @@ export function TransformTab() {
     setDestinations((prev) => prev.map((d) => {
       if (d.id !== id) return d;
       const indices = contract ? [0] : [];
-      return { ...d, contract, selectedSchemaIndices: indices, label: contract ? deriveLabel(contract, d.label) : d.label, mappingsBySchema: {}, verifyResultBySchema: {} };
+      return {
+        ...d, contract, selectedSchemaIndices: indices, label: contract ? deriveLabel(contract, d.label) : d.label,
+        mappingsBySchema: {}, verifyResultBySchema: {},
+        executionOrderBySchema: {}, preStepsBySchema: {}, postStepsBySchema: {}, notesBySchema: {},
+      };
     }));
   }, []);
 
@@ -139,16 +148,35 @@ export function TransformTab() {
         ? d.selectedSchemaIndices.filter((i) => i !== index)
         : [...d.selectedSchemaIndices, index].sort();
       if (indices.length === 0) return d;
-      // Remove mappings for deselected schemas.
+      // Remove all per-schema state for deselected schemas.
       const newMappings = { ...d.mappingsBySchema };
       const newVerify = { ...d.verifyResultBySchema };
-      for (const key of Object.keys(newMappings)) {
-        if (!indices.includes(Number(key))) {
-          delete newMappings[Number(key)];
-          delete newVerify[Number(key)];
+      const newExecOrder = { ...d.executionOrderBySchema };
+      const newPreSteps = { ...d.preStepsBySchema };
+      const newPostSteps = { ...d.postStepsBySchema };
+      const newNotes = { ...d.notesBySchema };
+      // Collect all schema indices across all per-schema maps.
+      const allKeys = new Set([
+        ...Object.keys(newMappings), ...Object.keys(newVerify),
+        ...Object.keys(newExecOrder), ...Object.keys(newPreSteps),
+        ...Object.keys(newPostSteps), ...Object.keys(newNotes),
+      ].map(Number));
+      for (const key of allKeys) {
+        if (!indices.includes(key)) {
+          delete newMappings[key];
+          delete newVerify[key];
+          delete newExecOrder[key];
+          delete newPreSteps[key];
+          delete newPostSteps[key];
+          delete newNotes[key];
         }
       }
-      return { ...d, selectedSchemaIndices: indices, mappingsBySchema: newMappings, verifyResultBySchema: newVerify };
+      return {
+        ...d, selectedSchemaIndices: indices,
+        mappingsBySchema: newMappings, verifyResultBySchema: newVerify,
+        executionOrderBySchema: newExecOrder, preStepsBySchema: newPreSteps,
+        postStepsBySchema: newPostSteps, notesBySchema: newNotes,
+      };
     }));
   }, []);
 
@@ -398,11 +426,10 @@ export function TransformTab() {
         </div>
       )}
 
-      {/* Mapping editor for active destination tab */}
       {/* Mapping editor for active destination tab.
-          The onMappingsChange closure captures activeTab from the render scope.
-          This is safe because React re-renders synchronously on tab switch,
-          so the closure is always fresh before the next user interaction. */}
+          The closures capture activeTab from the render scope. This is safe
+          because React re-renders synchronously on tab switch, so closures
+          are always fresh before the next user interaction. */}
       {activeTab && (
         <MappingEditor
           mappings={activeMappings}
@@ -417,6 +444,42 @@ export function TransformTab() {
           canGenerate={canGenerate}
           canAISuggest={canAISuggest}
           aiLoading={aiLoading}
+          executionOrder={activeEntry?.executionOrderBySchema[activeSchemaIdx] ?? 1}
+          onExecutionOrderChange={(order) => {
+            if (!activeTab) return;
+            setDestinations((prev) => prev.map((d) =>
+              d.id === activeTab.entryId
+                ? { ...d, executionOrderBySchema: { ...d.executionOrderBySchema, [activeTab.schemaIndex]: order } }
+                : d
+            ));
+          }}
+          preSteps={activeEntry?.preStepsBySchema[activeSchemaIdx] ?? []}
+          onPreStepsChange={(steps) => {
+            if (!activeTab) return;
+            setDestinations((prev) => prev.map((d) =>
+              d.id === activeTab.entryId
+                ? { ...d, preStepsBySchema: { ...d.preStepsBySchema, [activeTab.schemaIndex]: steps } }
+                : d
+            ));
+          }}
+          postSteps={activeEntry?.postStepsBySchema[activeSchemaIdx] ?? []}
+          onPostStepsChange={(steps) => {
+            if (!activeTab) return;
+            setDestinations((prev) => prev.map((d) =>
+              d.id === activeTab.entryId
+                ? { ...d, postStepsBySchema: { ...d.postStepsBySchema, [activeTab.schemaIndex]: steps } }
+                : d
+            ));
+          }}
+          notes={activeEntry?.notesBySchema[activeSchemaIdx] ?? ""}
+          onNotesChange={(text) => {
+            if (!activeTab) return;
+            setDestinations((prev) => prev.map((d) =>
+              d.id === activeTab.entryId
+                ? { ...d, notesBySchema: { ...d.notesBySchema, [activeTab.schemaIndex]: text } }
+                : d
+            ));
+          }}
         />
       )}
 
@@ -533,7 +596,12 @@ function buildTransformContract(sources: SourceEntry[], destinations: DestEntry[
       const ref = schemaRef(d, idx);
       destRefs.push(ref);
       const mappings = d.mappingsBySchema[idx] ?? [];
-      if (mappings.length > 0) {
+      const preSteps = d.preStepsBySchema[idx];
+      const postSteps = d.postStepsBySchema[idx];
+      const execOrder = d.executionOrderBySchema[idx];
+      const notes = d.notesBySchema[idx];
+      const hasContent = mappings.length > 0 || (preSteps && preSteps.length > 0) || (postSteps && postSteps.length > 0) || notes;
+      if (hasContent) {
         mappingGroups.push({
           destination_ref: ref,
           field_mappings: mappings.map((m) => ({
@@ -548,6 +616,10 @@ function buildTransformContract(sources: SourceEntry[], destinations: DestEntry[
             confidence: m.confidence,
             user_edited: m.user_edited,
           })),
+          execution_order: execOrder,
+          pre_steps: preSteps && preSteps.length > 0 ? preSteps : undefined,
+          post_steps: postSteps && postSteps.length > 0 ? postSteps : undefined,
+          notes: notes || undefined,
         });
       }
     }

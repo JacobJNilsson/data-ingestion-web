@@ -101,9 +101,47 @@ export interface ExecutionPlan {
   validation_enabled: boolean;
 }
 
+// Data flow step types for multi-step ingestion
+
+export type DataFlowStepType = "manual_label" | "llm_classify" | "lookup" | "capture_response";
+
+export interface ManualLabelConfig {
+  field: string;
+  options: string[];
+  instructions: string;
+  allow_custom: boolean;
+}
+
+export interface LLMClassifyConfig {
+  field: string;
+  categories: string[];
+  prompt: string;
+  model: string;
+}
+
+export interface LookupConfig {
+  source_ref: string;
+  key_field: string;
+  value_field: string;
+}
+
+export interface CaptureResponseConfig {
+  fields: string[];
+}
+
+export interface DataFlowStep {
+  type: DataFlowStepType;
+  config: ManualLabelConfig | LLMClassifyConfig | LookupConfig | CaptureResponseConfig;
+  notes?: string;
+}
+
 export interface MappingGroup {
   destination_ref: string;
   field_mappings: FieldMapping[];
+  execution_order?: number;
+  pre_steps?: DataFlowStep[];
+  post_steps?: DataFlowStep[];
+  notes?: string;
 }
 
 export interface TransformContract {
