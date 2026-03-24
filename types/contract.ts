@@ -102,8 +102,16 @@ export interface ExecutionPlan {
 }
 
 // Data flow step types for multi-step ingestion
+//
+// Steps are equal peers in an ordered list. Each step takes input from a
+// source schema or a previous step's output, and produces output that
+// downstream steps can reference.
 
-export type DataFlowStepType = "manual_label" | "llm_classify" | "lookup" | "capture_response";
+export type DataFlowStepType = "mapping" | "manual_label" | "llm_classify" | "lookup" | "capture_response";
+
+export interface MappingStepConfig {
+  field_mappings: FieldMapping[];
+}
 
 export interface ManualLabelConfig {
   field: string;
@@ -130,17 +138,15 @@ export interface CaptureResponseConfig {
 }
 
 export type DataFlowStep =
-  | { id: string; type: "manual_label"; config: ManualLabelConfig; notes?: string }
-  | { id: string; type: "llm_classify"; config: LLMClassifyConfig; notes?: string }
-  | { id: string; type: "lookup"; config: LookupConfig; notes?: string }
-  | { id: string; type: "capture_response"; config: CaptureResponseConfig; notes?: string };
+  | { id: string; type: "mapping"; input_ref: string; output_ref: string; config: MappingStepConfig; notes?: string }
+  | { id: string; type: "manual_label"; input_ref: string; output_ref: string; config: ManualLabelConfig; notes?: string }
+  | { id: string; type: "llm_classify"; input_ref: string; output_ref: string; config: LLMClassifyConfig; notes?: string }
+  | { id: string; type: "lookup"; input_ref: string; output_ref: string; config: LookupConfig; notes?: string }
+  | { id: string; type: "capture_response"; input_ref: string; output_ref: string; config: CaptureResponseConfig; notes?: string };
 
 export interface MappingGroup {
   destination_ref: string;
-  field_mappings: FieldMapping[];
-  execution_order?: number;
-  pre_steps?: DataFlowStep[];
-  post_steps?: DataFlowStep[];
+  steps: DataFlowStep[];
   notes?: string;
 }
 
