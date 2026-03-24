@@ -138,11 +138,11 @@ export interface CaptureResponseConfig {
 }
 
 export type DataFlowStep =
-  | { id: string; type: "mapping"; input_ref: string; output_ref: string; config: MappingStepConfig; notes?: string }
-  | { id: string; type: "manual_label"; input_ref: string; output_ref: string; config: ManualLabelConfig; notes?: string }
-  | { id: string; type: "llm_classify"; input_ref: string; output_ref: string; config: LLMClassifyConfig; notes?: string }
-  | { id: string; type: "lookup"; input_ref: string; output_ref: string; config: LookupConfig; notes?: string }
-  | { id: string; type: "capture_response"; input_ref: string; output_ref: string; config: CaptureResponseConfig; notes?: string };
+  | { id: string; type: "mapping"; input_ref: string; output_ref: string; config: MappingStepConfig; notes?: string; user_created?: boolean }
+  | { id: string; type: "manual_label"; input_ref: string; output_ref: string; config: ManualLabelConfig; notes?: string; user_created?: boolean }
+  | { id: string; type: "llm_classify"; input_ref: string; output_ref: string; config: LLMClassifyConfig; notes?: string; user_created?: boolean }
+  | { id: string; type: "lookup"; input_ref: string; output_ref: string; config: LookupConfig; notes?: string; user_created?: boolean }
+  | { id: string; type: "capture_response"; input_ref: string; output_ref: string; config: CaptureResponseConfig; notes?: string; user_created?: boolean };
 
 export interface MappingGroup {
   destination_ref: string;

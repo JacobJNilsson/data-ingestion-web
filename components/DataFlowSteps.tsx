@@ -10,7 +10,9 @@ import type {
 import { MappingEditor } from "@/components/MappingEditor";
 import type { NamedSourceGroup } from "@/components/MappingEditor";
 
-let nextStepId = 1;
+function newStepId(): string {
+  return `step_${crypto.randomUUID().slice(0, 8)}`;
+}
 
 const STEP_TYPE_LABELS: Record<DataFlowStepType, string> = {
   mapping: "Mapping",
@@ -24,8 +26,8 @@ const labelStyle = { color: "oklch(50% 0.01 80)" };
 const inputStyle = { borderColor: "oklch(88% 0.005 80)", color: "oklch(25% 0.01 80)" };
 
 function newStep(type: DataFlowStepType): DataFlowStep {
-  const id = `step_${nextStepId++}`;
-  const base = { id, input_ref: "", output_ref: "", notes: "" };
+  const id = newStepId();
+  const base = { id, input_ref: "", output_ref: "", notes: "", user_created: true };
   switch (type) {
     case "mapping":
       return { ...base, type, config: { field_mappings: [] } };
@@ -124,24 +126,27 @@ interface DataFlowStepsProps {
   onGenerateMappings?: (stepId: string) => void;
   onAISuggestMappings?: (stepId: string) => void;
   onVerifyMappings?: (stepId: string) => void;
+  onAIBuild?: () => void;
   mappingLoading?: boolean;
   aiLoading?: boolean;
+  aiBuildLoading?: boolean;
   canGenerate?: boolean;
   canAISuggest?: boolean;
+  canAIBuild?: boolean;
   notes?: string;
   onNotesChange?: (notes: string) => void;
 }
 
 export function DataFlowSteps({
   steps, onChange, sourceGroups, destFields,
-  onGenerateMappings, onAISuggestMappings, onVerifyMappings,
-  mappingLoading, aiLoading, canGenerate, canAISuggest,
+  onGenerateMappings, onAISuggestMappings, onVerifyMappings, onAIBuild,
+  mappingLoading, aiLoading, aiBuildLoading, canGenerate, canAISuggest, canAIBuild,
   notes, onNotesChange,
 }: DataFlowStepsProps) {
   const addStep = (type: DataFlowStepType) => onChange([...steps, newStep(type)]);
 
   const updateStep = (id: string, updates: Partial<DataFlowStep>) => {
-    onChange(steps.map((s) => (s.id === id ? { ...s, ...updates } as DataFlowStep : s)));
+    onChange(steps.map((s) => (s.id === id ? { ...s, ...updates, user_created: true } as DataFlowStep : s)));
   };
 
   const removeStep = (id: string) => onChange(steps.filter((s) => s.id !== id));
@@ -156,8 +161,23 @@ export function DataFlowSteps({
     onChange(ns);
   };
 
+  const isAnyLoading = (mappingLoading ?? false) || (aiLoading ?? false) || (aiBuildLoading ?? false);
+
   return (
     <div className="space-y-3">
+      {/* AI Build button */}
+      {onAIBuild && (
+        <button
+          type="button"
+          onClick={onAIBuild}
+          disabled={!canAIBuild || isAnyLoading}
+          className="w-full px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+          style={{ backgroundColor: "oklch(40% 0.08 280)", color: "oklch(98% 0.005 80)" }}
+        >
+          {aiBuildLoading ? "Building pipeline..." : "AI Build Pipeline"}
+        </button>
+      )}
+
       {steps.map((step, i) => {
         const inputOptions = resolveInputOptions(i, steps, sourceGroups, destFields);
         const selectedInput = inputOptions.find((o) => o.ref === step.input_ref);
@@ -170,6 +190,11 @@ export function DataFlowSteps({
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono" style={{ color: "oklch(55% 0.01 80)" }}>{i + 1}</span>
                 <span className="text-xs font-semibold" style={{ color: "oklch(30% 0.01 80)" }}>{STEP_TYPE_LABELS[step.type]}</span>
+                {step.user_created && (
+                  <span className="text-[10px] px-1 py-0.5 rounded font-medium"
+                    style={{ backgroundColor: "oklch(92% 0.02 260)", color: "oklch(45% 0.08 260)" }}
+                    title="User-created step — AI Build will preserve this">pinned</span>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => moveStep(step.id, -1)} disabled={i === 0}
