@@ -120,7 +120,13 @@ test.describe("Multi-schema mapping", () => {
       }
     }
 
-    // --- Generate mappings ---
+    // --- Add a Mapping step ---
+    await page.getByRole("button", { name: "+ Mapping" }).click();
+
+    // Wait for the mapping step to appear.
+    await expect(page.locator("text=Mapping").first()).toBeVisible({ timeout: 5_000 });
+
+    // --- Generate mappings within the mapping step ---
     await page.getByRole("button", { name: "Generate" }).click();
 
     // Wait for mapping table rows to appear.
