@@ -1,7 +1,7 @@
 "use client";
 
 import { AnalyzerPanel } from "@/components/AnalyzerPanel";
-import type { SourceContract, DataContract, FieldMapping, VerifyResult } from "@/types/contract";
+import type { SourceContract, DataContract, FieldMapping, VerifyResult, DataFlowStep } from "@/types/contract";
 
 export interface DestEntry {
   id: string;
@@ -11,6 +11,11 @@ export interface DestEntry {
   // Mappings and verify results keyed by schema index.
   mappingsBySchema: Record<number, FieldMapping[]>;
   verifyResultBySchema: Record<number, VerifyResult | null>;
+  // Data flow step state keyed by schema index.
+  executionOrderBySchema: Record<number, number>;
+  preStepsBySchema: Record<number, DataFlowStep[]>;
+  postStepsBySchema: Record<number, DataFlowStep[]>;
+  notesBySchema: Record<number, string>;
 }
 
 interface DestinationListProps {
