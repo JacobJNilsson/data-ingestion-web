@@ -9,11 +9,10 @@ import { SupabaseForm } from "@/components/SupabaseForm";
 import { APISpecForm } from "@/components/APISpecForm";
 import { DataContractDisplay } from "@/components/DataContractDisplay";
 import { TransformTab } from "@/components/TransformTab";
-import { PipelineTab } from "@/components/pipeline/PipelineTab";
 import type { SourceContract, DataContract } from "@/types/contract";
 import { DATA_INGESTION_API_URL } from "@/lib/constants";
 
-type Tab = "csv" | "json" | "excel" | "api" | "destination" | "supabase" | "transform" | "pipeline";
+type Tab = "csv" | "json" | "excel" | "api" | "destination" | "supabase" | "transform";
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("csv");
@@ -255,12 +254,6 @@ export default function Home() {
           >
             Transform
           </TabButton>
-          <TabButton
-            active={tab === "pipeline"}
-            onClick={() => { setTab("pipeline"); setError(null); }}
-          >
-            Pipeline
-          </TabButton>
         </div>
 
         {/* Tab content */}
@@ -347,8 +340,6 @@ export default function Home() {
         )}
 
         {tab === "transform" && <TransformTab />}
-
-        {tab === "pipeline" && <PipelineTab />}
 
         {/* Error — shared across all tabs */}
         {error && (

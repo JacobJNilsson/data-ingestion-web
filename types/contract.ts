@@ -116,39 +116,11 @@ export interface TransformContract {
   metadata?: Record<string, unknown>;
 }
 
-// Pipeline contracts
-
-export type PipelineStepType =
-  | "source"
-  | "mapping"
-  | "api_call"
-  | "manual_label"
-  | "llm_classify"
-  | "lookup"
-  | "destination";
-
-export interface PipelineStep {
-  id: string;
-  type: PipelineStepType;
-  label: string;
-  depends_on: string[];
-  inputs_from?: Record<string, string[]>;
-  config: Record<string, unknown>;
-  position?: { x: number; y: number };
-}
-
-export interface PipelineContract {
-  contract_type: "pipeline";
-  pipeline_id: string;
-  steps: PipelineStep[];
-  metadata?: Record<string, unknown>;
-}
-
 // Verification result
 
 export interface VerifyResult {
   valid: boolean;
-  contract_type?: string;
+  contract_type: string;
   issues?: string[];
 }
 
