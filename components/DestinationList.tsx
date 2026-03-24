@@ -1,20 +1,15 @@
 "use client";
 
 import { AnalyzerPanel } from "@/components/AnalyzerPanel";
-import type { SourceContract, DataContract, FieldMapping, VerifyResult, DataFlowStep } from "@/types/contract";
+import type { SourceContract, DataContract, DataFlowStep, VerifyResult } from "@/types/contract";
 
 export interface DestEntry {
   id: string;
   label: string;
   contract: SourceContract | DataContract | null;
   selectedSchemaIndices: number[];
-  // Mappings and verify results keyed by schema index.
-  mappingsBySchema: Record<number, FieldMapping[]>;
+  stepsBySchema: Record<number, DataFlowStep[]>;
   verifyResultBySchema: Record<number, VerifyResult | null>;
-  // Data flow step state keyed by schema index.
-  executionOrderBySchema: Record<number, number>;
-  preStepsBySchema: Record<number, DataFlowStep[]>;
-  postStepsBySchema: Record<number, DataFlowStep[]>;
   notesBySchema: Record<number, string>;
 }
 

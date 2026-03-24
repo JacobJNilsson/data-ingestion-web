@@ -5,8 +5,9 @@ import { SourceList } from "@/components/SourceList";
 import type { SourceEntry } from "@/components/SourceList";
 import { DestinationList } from "@/components/DestinationList";
 import type { DestEntry } from "@/components/DestinationList";
-import { MappingEditor } from "@/components/MappingEditor";
-import type { MappingRow, NamedSourceGroup } from "@/components/MappingEditor";
+import { DataFlowSteps } from "@/components/DataFlowSteps";
+import type { NamedSourceGroup } from "@/components/MappingEditor";
+import type { MappingRow } from "@/components/MappingEditor";
 import { LLMSettings } from "@/components/LLMSettings";
 import type { LLMConfig } from "@/components/LLMSettings";
 import { RawJSON } from "@/components/RawJSON";
@@ -14,6 +15,7 @@ import { DATA_INGESTION_API_URL } from "@/lib/constants";
 import type {
   SourceContract,
   DataContract,
+  DataFlowStep,
   DestinationField,
   FieldMapping,
   TransformContract,
@@ -33,8 +35,7 @@ function newDestEntry(): DestEntry {
   const id = `d${nextId++}`;
   return {
     id, label: `Destination ${id}`, contract: null, selectedSchemaIndices: [],
-    mappingsBySchema: {}, verifyResultBySchema: {},
-    executionOrderBySchema: {}, preStepsBySchema: {}, postStepsBySchema: {}, notesBySchema: {},
+    stepsBySchema: {}, verifyResultBySchema: {}, notesBySchema: {},
   };
 }
 
@@ -85,8 +86,9 @@ export function TransformTab() {
   // Get mappings/verifyResult/dataflow state for active tab.
   const activeEntry = activeTab ? destinations.find((d) => d.id === activeTab.entryId) : null;
   const activeSchemaIdx = activeTab?.schemaIndex ?? 0;
-  const activeMappings = activeEntry?.mappingsBySchema[activeSchemaIdx] ?? [];
+  const activeSteps = activeEntry?.stepsBySchema[activeSchemaIdx] ?? [];
   const activeVerifyResult = activeEntry?.verifyResultBySchema[activeSchemaIdx] ?? null;
+  const activeNotes = activeEntry?.notesBySchema[activeSchemaIdx] ?? "";
 
   // --- Source handlers ---
   const handleSourceChange = useCallback((id: string, contract: SourceContract | DataContract | null) => {
@@ -96,7 +98,7 @@ export function TransformTab() {
       const indices = contract ? [0] : [];
       return { ...s, contract, selectedSchemaIndices: indices, label: contract ? deriveLabel(contract, s.label) : s.label };
     }));
-    setDestinations((prev) => prev.map((d) => ({ ...d, mappingsBySchema: {}, verifyResultBySchema: {} })));
+    setDestinations((prev) => prev.map((d) => ({ ...d, stepsBySchema: {}, verifyResultBySchema: {}, notesBySchema: {} })));
   }, []);
 
   const handleSourceSchemaToggle = useCallback((id: string, index: number) => {
@@ -109,7 +111,7 @@ export function TransformTab() {
       if (indices.length === 0) return s;
       return { ...s, selectedSchemaIndices: indices };
     }));
-    setDestinations((prev) => prev.map((d) => ({ ...d, mappingsBySchema: {}, verifyResultBySchema: {} })));
+    setDestinations((prev) => prev.map((d) => ({ ...d, stepsBySchema: {}, verifyResultBySchema: {}, notesBySchema: {} })));
   }, []);
 
   const handleSourceLabelChange = useCallback((id: string, label: string) => {
@@ -125,7 +127,7 @@ export function TransformTab() {
       const filtered = prev.filter((s) => s.id !== id);
       return filtered.length > 0 ? filtered : prev;
     });
-    setDestinations((prev) => prev.map((d) => ({ ...d, mappingsBySchema: {}, verifyResultBySchema: {} })));
+    setDestinations((prev) => prev.map((d) => ({ ...d, stepsBySchema: {}, verifyResultBySchema: {}, notesBySchema: {} })));
   }, []);
 
   // --- Destination handlers ---
@@ -135,8 +137,7 @@ export function TransformTab() {
       const indices = contract ? [0] : [];
       return {
         ...d, contract, selectedSchemaIndices: indices, label: contract ? deriveLabel(contract, d.label) : d.label,
-        mappingsBySchema: {}, verifyResultBySchema: {},
-        executionOrderBySchema: {}, preStepsBySchema: {}, postStepsBySchema: {}, notesBySchema: {},
+        stepsBySchema: {}, verifyResultBySchema: {}, notesBySchema: {},
       };
     }));
   }, []);
@@ -148,34 +149,23 @@ export function TransformTab() {
         ? d.selectedSchemaIndices.filter((i) => i !== index)
         : [...d.selectedSchemaIndices, index].sort();
       if (indices.length === 0) return d;
-      // Remove all per-schema state for deselected schemas.
-      const newMappings = { ...d.mappingsBySchema };
+      // Remove per-schema state for deselected schemas.
+      const newSteps = { ...d.stepsBySchema };
       const newVerify = { ...d.verifyResultBySchema };
-      const newExecOrder = { ...d.executionOrderBySchema };
-      const newPreSteps = { ...d.preStepsBySchema };
-      const newPostSteps = { ...d.postStepsBySchema };
       const newNotes = { ...d.notesBySchema };
-      // Collect all schema indices across all per-schema maps.
       const allKeys = new Set([
-        ...Object.keys(newMappings), ...Object.keys(newVerify),
-        ...Object.keys(newExecOrder), ...Object.keys(newPreSteps),
-        ...Object.keys(newPostSteps), ...Object.keys(newNotes),
+        ...Object.keys(newSteps), ...Object.keys(newVerify), ...Object.keys(newNotes),
       ].map(Number));
       for (const key of allKeys) {
         if (!indices.includes(key)) {
-          delete newMappings[key];
+          delete newSteps[key];
           delete newVerify[key];
-          delete newExecOrder[key];
-          delete newPreSteps[key];
-          delete newPostSteps[key];
           delete newNotes[key];
         }
       }
       return {
         ...d, selectedSchemaIndices: indices,
-        mappingsBySchema: newMappings, verifyResultBySchema: newVerify,
-        executionOrderBySchema: newExecOrder, preStepsBySchema: newPreSteps,
-        postStepsBySchema: newPostSteps, notesBySchema: newNotes,
+        stepsBySchema: newSteps, verifyResultBySchema: newVerify, notesBySchema: newNotes,
       };
     }));
   }, []);
@@ -197,10 +187,10 @@ export function TransformTab() {
     });
   }, []);
 
-  const handleMappingsChange = useCallback((entryId: string, schemaIndex: number, newMappings: FieldMapping[]) => {
+  const handleStepsChange = useCallback((entryId: string, schemaIndex: number, newSteps: DataFlowStep[]) => {
     setDestinations((prev) => prev.map((d) =>
       d.id === entryId
-        ? { ...d, mappingsBySchema: { ...d.mappingsBySchema, [schemaIndex]: newMappings }, verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: null } }
+        ? { ...d, stepsBySchema: { ...d.stepsBySchema, [schemaIndex]: newSteps }, verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: null } }
         : d
     ));
   }, []);
@@ -221,14 +211,13 @@ export function TransformTab() {
   const canGenerate = sourceGroups.length > 0 && (activeTab?.fields.length ?? 0) > 0;
   const canAISuggest = canGenerate && llmConfig.apiKey.trim().length > 0;
 
-  // --- Generate (deterministic) ---
-  const handleGenerate = async () => {
-    if (!activeTab || !activeEntry) return;
+  // --- Generate mappings for a specific mapping step ---
+  const handleGenerateMappings = async (stepId: string) => {
+    if (!activeTab || !activeEntry?.contract) return;
     const { entryId, schemaIndex } = activeTab;
     setGenerating(true);
     setError("");
     try {
-      // Build source fields with types.
       const properSources: { ref: string; fields: { Name: string; DataType: string; Nullable?: boolean }[] }[] = [];
       for (const s of sources) {
         if (!s.contract) continue;
@@ -236,17 +225,11 @@ export function TransformTab() {
           properSources.push({ ref: schemaRef(s, idx), fields: extractAPIFields(s.contract, idx) });
         }
       }
-
-      const destFields = extractAPIFields(activeEntry.contract!, schemaIndex);
-
+      const destFields = extractAPIFields(activeEntry.contract, schemaIndex);
       const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/suggest-mappings-multi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sources: properSources,
-          destination_ref: activeTab.label,
-          destination_fields: destFields,
-        }),
+        body: JSON.stringify({ sources: properSources, destination_ref: activeTab.label, destination_fields: destFields }),
       });
       if (!resp.ok) {
         const body = await resp.json().catch(() => null);
@@ -254,13 +237,18 @@ export function TransformTab() {
       }
       const data = await resp.json();
       const generated: FieldMapping[] = (data.mappings || []).map((m: FieldMapping) => ({
-        ...m,
-        source_type: m.source_type || (m.source_field ? "field" : "unmapped"),
-        _id: nextMappingId++,
-        confidence: m.confidence ?? 0,
-        user_edited: false,
+        ...m, source_type: m.source_type || (m.source_field ? "field" : "unmapped"),
+        _id: nextMappingId++, confidence: m.confidence ?? 0, user_edited: false,
       }));
-      handleMappingsChange(entryId, schemaIndex, generated);
+      // Update the specific mapping step using functional updater to avoid stale closure.
+      setDestinations((prev) => prev.map((d) => {
+        if (d.id !== entryId) return d;
+        const currentSteps = d.stepsBySchema[schemaIndex] ?? [];
+        const updatedSteps = currentSteps.map((s) =>
+          s.id === stepId && s.type === "mapping" ? { ...s, config: { field_mappings: generated } } as DataFlowStep : s
+        );
+        return { ...d, stepsBySchema: { ...d.stepsBySchema, [schemaIndex]: updatedSteps }, verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: null } };
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate mappings");
     } finally {
@@ -268,15 +256,16 @@ export function TransformTab() {
     }
   };
 
-  // --- AI Suggest ---
-  const handleAISuggest = async () => {
+  // --- AI Suggest mappings for a specific mapping step ---
+  const handleAISuggestMappings = async (stepId: string) => {
     if (!activeTab || !activeEntry?.contract) return;
     const { entryId, schemaIndex } = activeTab;
-    const currentMappings = activeMappings;
+    const mappingStep = activeSteps.find((s) => s.id === stepId && s.type === "mapping");
+    if (!mappingStep || mappingStep.type !== "mapping") return;
+    const currentMappings = mappingStep.config.field_mappings;
     setAiLoading(true);
     setError("");
     try {
-      // Build source contracts map.
       const sourceContracts: Record<string, unknown> = {};
       for (const s of sources) {
         if (!s.contract) continue;
@@ -284,7 +273,6 @@ export function TransformTab() {
           sourceContracts[schemaRef(s, idx)] = extractSchemaContract(s.contract, idx);
         }
       }
-
       const destContracts: Record<string, unknown> = {};
       destContracts[activeTab.label] = extractSchemaContract(activeEntry.contract, schemaIndex);
 
@@ -292,11 +280,8 @@ export function TransformTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: llmConfig.provider,
-          api_key: llmConfig.apiKey,
-          model: llmConfig.model,
-          source_contracts: sourceContracts,
-          destination_contracts: destContracts,
+          provider: llmConfig.provider, api_key: llmConfig.apiKey, model: llmConfig.model,
+          source_contracts: sourceContracts, destination_contracts: destContracts,
           current_mappings: currentMappings.length > 0 ? currentMappings : undefined,
         }),
       });
@@ -305,24 +290,27 @@ export function TransformTab() {
         throw new Error(body?.error || `API error: ${resp.status}`);
       }
       const data = await resp.json();
-
-      // Merge: preserve user-edited mappings.
       const userEditedMap = new Map(
         (currentMappings as MappingRow[]).filter((m) => m.user_edited).map((m) => [m.destination_field, m])
       );
       const aiMappings: FieldMapping[] = data.mappings || [];
       const aiDestFields = new Set(aiMappings.map((m: FieldMapping) => m.destination_field));
       const merged: MappingRow[] = aiMappings.map((m: FieldMapping) => {
-        const userEdited = userEditedMap.get(m.destination_field);
-        if (userEdited) return { ...userEdited, _id: userEdited._id ?? nextMappingId++ };
+        const ue = userEditedMap.get(m.destination_field);
+        if (ue) return { ...ue, _id: ue._id ?? nextMappingId++ };
         return { ...m, source_type: m.source_type || "unmapped", _id: nextMappingId++, confidence: m.confidence ?? 0, user_edited: false };
       });
-      for (const [destField, userEdited] of userEditedMap) {
-        if (!aiDestFields.has(destField)) {
-          merged.push({ ...userEdited, _id: userEdited._id ?? nextMappingId++ });
-        }
+      for (const [df, ue] of userEditedMap) {
+        if (!aiDestFields.has(df)) merged.push({ ...ue, _id: ue._id ?? nextMappingId++ });
       }
-      handleMappingsChange(entryId, schemaIndex, merged);
+      setDestinations((prev) => prev.map((d) => {
+        if (d.id !== entryId) return d;
+        const currentSteps = d.stepsBySchema[schemaIndex] ?? [];
+        const updatedSteps = currentSteps.map((s) =>
+          s.id === stepId && s.type === "mapping" ? { ...s, config: { field_mappings: merged } } as DataFlowStep : s
+        );
+        return { ...d, stepsBySchema: { ...d.stepsBySchema, [schemaIndex]: updatedSteps }, verifyResultBySchema: { ...d.verifyResultBySchema, [schemaIndex]: null } };
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI suggestion failed");
     } finally {
@@ -377,8 +365,8 @@ export function TransformTab() {
   };
 
   const loading = generating || verifying;
-  const hasAnyMappings = destinations.some((d) => Object.values(d.mappingsBySchema).some((m) => m.length > 0));
-  const transformContract = hasAnyMappings ? buildTransformContract(sources, destinations) : null;
+  const hasAnySteps = destinations.some((d) => Object.values(d.stepsBySchema).some((s) => s.length > 0));
+  const transformContract = hasAnySteps ? buildTransformContract(sources, destinations) : null;
 
   return (
     <div className="space-y-8">
@@ -426,52 +414,20 @@ export function TransformTab() {
         </div>
       )}
 
-      {/* Mapping editor for active destination tab.
-          The closures capture activeTab from the render scope. This is safe
-          because React re-renders synchronously on tab switch, so closures
-          are always fresh before the next user interaction. */}
+      {/* Step list for active destination tab */}
       {activeTab && (
-        <MappingEditor
-          mappings={activeMappings}
+        <DataFlowSteps
+          steps={activeSteps}
+          onChange={(newSteps) => handleStepsChange(activeTab.entryId, activeTab.schemaIndex, newSteps)}
           sourceGroups={sourceGroups}
           destFields={activeTab.fields}
-          onMappingsChange={(m) => handleMappingsChange(activeTab.entryId, activeTab.schemaIndex, m)}
-          onGenerate={handleGenerate}
-          onAISuggest={handleAISuggest}
-          onVerify={handleVerify}
-          verifyResult={activeVerifyResult}
-          loading={loading}
+          onGenerateMappings={handleGenerateMappings}
+          onAISuggestMappings={handleAISuggestMappings}
+          mappingLoading={generating}
+          aiLoading={aiLoading}
           canGenerate={canGenerate}
           canAISuggest={canAISuggest}
-          aiLoading={aiLoading}
-          executionOrder={activeEntry?.executionOrderBySchema[activeSchemaIdx] ?? 1}
-          onExecutionOrderChange={(order) => {
-            if (!activeTab) return;
-            setDestinations((prev) => prev.map((d) =>
-              d.id === activeTab.entryId
-                ? { ...d, executionOrderBySchema: { ...d.executionOrderBySchema, [activeTab.schemaIndex]: order } }
-                : d
-            ));
-          }}
-          preSteps={activeEntry?.preStepsBySchema[activeSchemaIdx] ?? []}
-          onPreStepsChange={(steps) => {
-            if (!activeTab) return;
-            setDestinations((prev) => prev.map((d) =>
-              d.id === activeTab.entryId
-                ? { ...d, preStepsBySchema: { ...d.preStepsBySchema, [activeTab.schemaIndex]: steps } }
-                : d
-            ));
-          }}
-          postSteps={activeEntry?.postStepsBySchema[activeSchemaIdx] ?? []}
-          onPostStepsChange={(steps) => {
-            if (!activeTab) return;
-            setDestinations((prev) => prev.map((d) =>
-              d.id === activeTab.entryId
-                ? { ...d, postStepsBySchema: { ...d.postStepsBySchema, [activeTab.schemaIndex]: steps } }
-                : d
-            ));
-          }}
-          notes={activeEntry?.notesBySchema[activeSchemaIdx] ?? ""}
+          notes={activeNotes}
           onNotesChange={(text) => {
             if (!activeTab) return;
             setDestinations((prev) => prev.map((d) =>
@@ -481,6 +437,35 @@ export function TransformTab() {
             ));
           }}
         />
+      )}
+
+      {/* Verify button (destination-level, verifies the full transform contract) */}
+      {activeTab && (
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={handleVerify} disabled={!hasAnySteps || verifying}
+            className="px-4 py-2 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40"
+            style={{ borderColor: "oklch(80% 0.005 80)", color: "oklch(35% 0.01 80)" }}>
+            {verifying ? "Verifying..." : "Verify"}
+          </button>
+        </div>
+      )}
+
+      {/* Verify result */}
+      {activeVerifyResult && (
+        <div className="p-3 rounded-lg border-l-4 text-sm" style={{
+          borderColor: activeVerifyResult.valid ? "oklch(50% 0.1 140)" : "oklch(55% 0.15 20)",
+          backgroundColor: activeVerifyResult.valid ? "oklch(97% 0.02 140)" : "oklch(95% 0.02 20)",
+          color: activeVerifyResult.valid ? "oklch(30% 0.08 140)" : "oklch(35% 0.08 20)",
+        }}>
+          <span className="font-semibold">{activeVerifyResult.valid ? "Valid" : "Invalid"}</span>
+          {activeVerifyResult.issues && activeVerifyResult.issues.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {activeVerifyResult.issues.map((issue, i) => (
+                <li key={i} className="text-xs">• {issue}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Error */}
@@ -595,30 +580,12 @@ function buildTransformContract(sources: SourceEntry[], destinations: DestEntry[
     for (const idx of d.selectedSchemaIndices) {
       const ref = schemaRef(d, idx);
       destRefs.push(ref);
-      const mappings = d.mappingsBySchema[idx] ?? [];
-      const preSteps = d.preStepsBySchema[idx];
-      const postSteps = d.postStepsBySchema[idx];
-      const execOrder = d.executionOrderBySchema[idx];
+      const steps = d.stepsBySchema[idx] ?? [];
       const notes = d.notesBySchema[idx];
-      const hasContent = mappings.length > 0 || (preSteps && preSteps.length > 0) || (postSteps && postSteps.length > 0) || notes;
-      if (hasContent) {
+      if (steps.length > 0 || notes) {
         mappingGroups.push({
           destination_ref: ref,
-          field_mappings: mappings.map((m) => ({
-            destination_field: m.destination_field,
-            source_type: m.source_type || "unmapped",
-            source_ref: m.source_type === "field" ? m.source_ref : undefined,
-            source_field: m.source_type === "field" ? m.source_field : undefined,
-            source_constant: m.source_type === "constant" ? m.source_constant : undefined,
-            source_fields: m.source_type === "transform" ? m.source_fields : undefined,
-            transform_description: m.source_type === "transform" ? m.transform_description : undefined,
-            transformation: m.transformation,
-            confidence: m.confidence,
-            user_edited: m.user_edited,
-          })),
-          execution_order: execOrder,
-          pre_steps: preSteps && preSteps.length > 0 ? preSteps : undefined,
-          post_steps: postSteps && postSteps.length > 0 ? postSteps : undefined,
+          steps,
           notes: notes || undefined,
         });
       }

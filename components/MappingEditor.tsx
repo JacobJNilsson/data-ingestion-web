@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { FieldMapping, VerifyResult, DestinationField, DataFlowStep } from "@/types/contract";
+import type { FieldMapping, VerifyResult, DestinationField } from "@/types/contract";
 import { ConstraintBadge } from "@/components/badges";
-import { DataFlowSteps } from "@/components/DataFlowSteps";
 
 // Delimiter for encoding ref+field in dropdown option values.
 // Using null byte avoids collision with any user-typed label content.
@@ -27,21 +26,12 @@ interface MappingEditorProps {
   onMappingsChange: (mappings: MappingRow[]) => void;
   onGenerate: () => void;
   onAISuggest?: () => void;
-  onVerify: () => void;
-  verifyResult: VerifyResult | null;
+  onVerify?: () => void;
+  verifyResult?: VerifyResult | null;
   loading: boolean;
   canGenerate: boolean;
   canAISuggest?: boolean;
   aiLoading?: boolean;
-  // Data flow step props
-  executionOrder?: number;
-  onExecutionOrderChange?: (order: number) => void;
-  preSteps?: DataFlowStep[];
-  onPreStepsChange?: (steps: DataFlowStep[]) => void;
-  postSteps?: DataFlowStep[];
-  onPostStepsChange?: (steps: DataFlowStep[]) => void;
-  notes?: string;
-  onNotesChange?: (notes: string) => void;
 }
 
 export function MappingEditor({
@@ -57,14 +47,6 @@ export function MappingEditor({
   canGenerate,
   canAISuggest,
   aiLoading,
-  executionOrder,
-  onExecutionOrderChange,
-  preSteps,
-  onPreStepsChange,
-  postSteps,
-  onPostStepsChange,
-  notes,
-  onNotesChange,
 }: MappingEditorProps) {
   const destFieldMap = new Map(destFields.map((f) => [f.name, f]));
   const hasMultipleSources = sourceGroups.length > 1;
@@ -121,36 +103,7 @@ export function MappingEditor({
   const isAnyLoading = loading || (aiLoading ?? false);
 
   return (
-    <div className="space-y-4">
-      {/* Execution order (only shown when callback provided) */}
-      {onExecutionOrderChange && (
-        <div className="flex items-center gap-3">
-          <label
-            className="text-xs font-semibold uppercase tracking-wider"
-            style={{ color: "oklch(45% 0.01 80)" }}
-          >
-            Execution Order
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={executionOrder ?? 1}
-            onChange={(e) => onExecutionOrderChange(parseInt(e.target.value, 10) || 1)}
-            className="w-16 px-2 py-1 border rounded text-xs text-center"
-            style={{ borderColor: "oklch(85% 0.005 80)", color: "oklch(25% 0.01 80)" }}
-          />
-        </div>
-      )}
-
-      {/* Pre-steps */}
-      {onPreStepsChange && (
-        <DataFlowSteps
-          label="Pre-steps"
-          steps={preSteps ?? []}
-          onChange={onPreStepsChange}
-        />
-      )}
-
+    <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "oklch(45% 0.01 80)" }}>
           Field Mappings
@@ -168,7 +121,7 @@ export function MappingEditor({
               {aiLoading ? "Thinking..." : "AI Suggest"}
             </button>
           )}
-          {mappings.length > 0 && (
+          {onVerify && mappings.length > 0 && (
             <button type="button" onClick={onVerify} disabled={isAnyLoading}
               className="px-4 py-2 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40"
               style={{ borderColor: "oklch(80% 0.005 80)", color: "oklch(35% 0.01 80)" }}>
@@ -327,38 +280,6 @@ export function MappingEditor({
         </div>
       )}
 
-      {/* Post-steps */}
-      {onPostStepsChange && (
-        <DataFlowSteps
-          label="Post-steps"
-          steps={postSteps ?? []}
-          onChange={onPostStepsChange}
-        />
-      )}
-
-      {/* Notes */}
-      {onNotesChange && (
-        <div>
-          <label
-            className="block text-xs font-semibold uppercase tracking-wider mb-1"
-            style={{ color: "oklch(45% 0.01 80)" }}
-          >
-            Notes
-          </label>
-          <textarea
-            value={notes ?? ""}
-            onChange={(e) => onNotesChange(e.target.value)}
-            placeholder="Describe dependencies, prerequisites, or special handling for this mapping group..."
-            rows={2}
-            className="w-full px-3 py-2 border rounded text-sm"
-            style={{
-              borderColor: "oklch(85% 0.005 80)",
-              color: "oklch(25% 0.01 80)",
-              backgroundColor: "oklch(100% 0 0)",
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
