@@ -162,15 +162,19 @@ export function TransformTab() {
       const step = steps.find((s) => s.id === stepId && s.type === "map");
       const currentMappings = step?.type === "map" ? step.config.field_mappings : [];
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
       const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/ai-suggest-mappings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           provider: llmConfig.provider, api_key: llmConfig.apiKey, model: llmConfig.model,
           source_contracts: srcContracts, destination_contracts: dstContracts,
           current_mappings: currentMappings.length > 0 ? currentMappings : undefined,
         }),
       });
+      clearTimeout(timeoutId);
       if (!resp.ok) {
         const body = await resp.json().catch(() => null);
         throw new Error(body?.error || `API error: ${resp.status}`);
@@ -183,7 +187,11 @@ export function TransformTab() {
         s.id === stepId && s.type === "map" ? { ...s, config: { field_mappings: mappings } } as PipelineStep : s
       ));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI suggestion failed");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("AI suggestion timed out. Try with fewer sources or a faster model.");
+      } else {
+        setError(err instanceof Error ? err.message : "AI suggestion failed");
+      }
     } finally {
       setAiLoading(false);
     }
@@ -208,15 +216,19 @@ export function TransformTab() {
       }
       const existingUserSteps = steps.filter((s) => s.user_created);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
       const resp = await fetch(`${DATA_INGESTION_API_URL}/api/v1/ai-pipeline-plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           provider: llmConfig.provider, api_key: llmConfig.apiKey, model: llmConfig.model,
           source_contracts: srcContracts, destination_contracts: dstContracts,
           existing_steps_by_destination: existingUserSteps.length > 0 ? { pipeline: existingUserSteps } : undefined,
         }),
       });
+      clearTimeout(timeoutId);
       if (!resp.ok) {
         const body = await resp.json().catch(() => null);
         throw new Error(body?.error || `API error: ${resp.status}`);
@@ -233,7 +245,11 @@ export function TransformTab() {
       }
       setSteps(allSteps);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI Build failed");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Pipeline plan generation timed out. Try with fewer sources/destinations or a faster model.");
+      } else {
+        setError(err instanceof Error ? err.message : "Pipeline plan generation failed");
+      }
     } finally {
       setAiBuildLoading(false);
     }
