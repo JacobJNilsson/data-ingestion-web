@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useHealthPing } from "@/lib/useHealthPing";
 import { CSVUpload } from "@/components/CSVUpload";
 import { FileUpload } from "@/components/FileUpload";
 import { ContractDisplay } from "@/components/ContractDisplay";
@@ -15,6 +16,7 @@ import { DATA_INGESTION_API_URL } from "@/lib/constants";
 type Tab = "csv" | "json" | "excel" | "api" | "destination" | "supabase" | "transform";
 
 export default function Home() {
+  useHealthPing();
   const [tab, setTab] = useState<Tab>("csv");
   const [sourceContract, setSourceContract] = useState<SourceContract | null>(null);
   const [jsonContract, setJsonContract] = useState<SourceContract | null>(null);
