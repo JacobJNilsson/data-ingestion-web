@@ -124,7 +124,7 @@ export function DataFlowSteps({
         <button type="button" onClick={onAIBuild} disabled={!canAIBuild || isAnyLoading}
           className="w-full px-4 py-2.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
           style={{ backgroundColor: "oklch(40% 0.08 280)", color: "oklch(98% 0.005 80)" }}>
-          {aiBuildLoading ? "Building pipeline..." : "AI Build Pipeline"}
+          {aiBuildLoading ? "Generating plan..." : "Generate Pipeline Plan"}
         </button>
       )}
 
