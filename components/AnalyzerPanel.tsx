@@ -72,6 +72,7 @@ export function AnalyzerPanel({ label, contract, selectedSchemaIndices, onContra
   };
 
   const isMultiSchema = contract && "schemas" in contract && "id" in contract
+    && Array.isArray((contract as DataContract).schemas)
     && (contract as DataContract).schemas.length > 1;
   const schemas = isMultiSchema ? (contract as DataContract).schemas : null;
 

@@ -329,7 +329,7 @@ export function TransformTab() {
 // --- Helpers ---
 
 function isDataContract(c: SourceContract | DataContract): c is DataContract {
-  return "schemas" in c && "id" in c;
+  return "schemas" in c && "id" in c && Array.isArray((c as DataContract).schemas);
 }
 
 function extractFieldNames(contract: SourceContract | DataContract, schemaIndex: number): string[] {
