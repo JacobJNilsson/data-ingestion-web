@@ -8,7 +8,7 @@ interface CompactSummaryProps {
 }
 
 export function CompactSummary({ contract, selectedSchemaIndex }: CompactSummaryProps) {
-  if ("schemas" in contract && "id" in contract) {
+  if ("schemas" in contract && "id" in contract && Array.isArray((contract as DataContract).schemas)) {
     return <DataContractSummaryView contract={contract as DataContract} selectedSchemaIndex={selectedSchemaIndex ?? 0} />;
   }
   return <SourceSummary contract={contract as SourceContract} />;
