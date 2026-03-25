@@ -82,8 +82,8 @@ test.describe("Multi-schema mapping", () => {
     // Add a Mapping step.
     await page.getByRole("button", { name: "+ Map" }).click();
 
-    // Generate.
-    await page.getByRole("button", { name: "Generate" }).click();
+    // Generate (exact match to avoid "Generate Pipeline Plan").
+    await page.getByRole("button", { name: "Generate", exact: true }).click();
     await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 30_000 });
 
     // Assert all fields come from user endpoint.

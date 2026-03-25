@@ -333,8 +333,8 @@ function isDataContract(c: SourceContract | DataContract): c is DataContract {
 }
 
 function extractFieldNames(contract: SourceContract | DataContract, schemaIndex: number): string[] {
-  if (isDataContract(contract)) return contract.schemas[schemaIndex]?.fields.map((f) => f.name) ?? [];
-  return contract.fields.map((f) => f.name);
+  if (isDataContract(contract)) return contract.schemas[schemaIndex]?.fields?.map((f) => f.name) ?? [];
+  return (contract as SourceContract).fields?.map((f) => f.name) ?? [];
 }
 
 function getSchemaName(contract: SourceContract | DataContract, schemaIndex: number): string | null {

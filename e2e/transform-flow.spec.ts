@@ -66,8 +66,8 @@ test.describe("Pipeline: basic flow", () => {
     // Add a map step.
     await addStep(page, "Map");
 
-    // Click Generate.
-    await page.getByRole("button", { name: "Generate" }).click();
+    // Click Generate (exact match to avoid matching "Generate Pipeline Plan").
+    await page.getByRole("button", { name: "Generate", exact: true }).click();
     await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 15_000 });
 
     // Should have 5 mapped fields.
@@ -176,5 +176,77 @@ test.describe("Pipeline: contract output", () => {
       expect(Array.isArray(step.inputs)).toBe(true);
       expect(typeof step.output).toBe("string");
     }
+  });
+});
+
+test.describe("Pipeline: error handling", () => {
+  test("failed Supabase analysis shows error without crashing", async ({ page }) => {
+    await goToTransform(page);
+
+    // Select Supabase analyzer.
+    const conn = page.locator('select[id*="conn"][id*="type-select"]').first();
+    await conn.selectOption("supabase");
+
+    // Submit with an invalid URL and key.
+    const urlInput = page.locator('input[placeholder*="https://"]').first();
+    await urlInput.fill("https://invalid.supabase.co");
+
+    const keyInput = page.locator('input[type="password"]').first();
+    await keyInput.fill("fake-key");
+
+    await page.locator('button:has-text("Analyze")').first().click();
+
+    // Should show an error message, NOT crash.
+    // Wait for either an error message or the "Analyzed" state.
+    const errorOrAnalyzed = await Promise.race([
+      page.locator("text=analysis failed").waitFor({ timeout: 15_000 }).then(() => "error"),
+      page.locator("text=API error").waitFor({ timeout: 15_000 }).then(() => "error"),
+      page.locator("text=Analyzed").waitFor({ timeout: 15_000 }).then(() => "analyzed"),
+    ]).catch(() => "timeout");
+
+    // Should be an error, not a crash.
+    expect(errorOrAnalyzed).toBe("error");
+
+    // The page should still be functional -- no unhandled exception.
+    // Verify we can still interact with the page.
+    await expect(page.getByRole("button", { name: "+ Add Connection" })).toBeVisible();
+  });
+
+  test("page does not crash with malformed contract response", async ({ page }) => {
+    // Intercept the analyze-supabase endpoint to return a malformed contract
+    // with schemas: null (the exact bug scenario).
+    await page.route("**/api/v1/analyze-supabase", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          contract_type: "destination",
+          id: "bad-db",
+          schemas: null,
+        }),
+      });
+    });
+
+    await goToTransform(page);
+
+    const conn = page.locator('select[id*="conn"][id*="type-select"]').first();
+    await conn.selectOption("supabase");
+
+    const urlInput = page.locator('input[placeholder*="https://"]').first();
+    await urlInput.fill("https://test.supabase.co");
+
+    const keyInput = page.locator('input[type="password"]').first();
+    await keyInput.fill("test-key");
+
+    await page.locator('button:has-text("Analyze")').first().click();
+
+    // Wait for the contract to be set (mocked response returns immediately).
+    await page.waitForTimeout(1000);
+
+    // The page should NOT have crashed -- verify we can still interact.
+    await expect(page.getByRole("button", { name: "+ Add Connection" })).toBeVisible();
+
+    // No unhandled errors should appear (the schemas: null contract is
+    // treated as a SourceContract since Array.isArray(null) is false).
   });
 });

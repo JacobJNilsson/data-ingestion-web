@@ -15,16 +15,17 @@ export function CompactSummary({ contract, selectedSchemaIndex }: CompactSummary
 }
 
 function SourceSummary({ contract }: { contract: SourceContract }) {
+  const fields = contract.fields ?? [];
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <Badge>{contract.source_format.toUpperCase()}</Badge>
+        <Badge>{contract.source_format?.toUpperCase() ?? "Unknown"}</Badge>
         <span className="text-xs" style={{ color: "oklch(50% 0.01 80)" }}>
-          {contract.total_rows.toLocaleString()} rows, {contract.fields.length} fields
+          {(contract.total_rows ?? 0).toLocaleString()} rows, {fields.length} fields
         </span>
       </div>
       <div className="flex flex-wrap gap-1">
-        {contract.fields.map((f) => (
+        {fields.map((f) => (
           <FieldBadge key={f.name} name={f.name} type={f.data_type} />
         ))}
       </div>
