@@ -95,68 +95,113 @@ export interface FieldMapping {
   user_edited?: boolean;
 }
 
-export interface ExecutionPlan {
-  batch_size: number;
-  error_threshold: number;
-  validation_enabled: boolean;
+// Pipeline contract types
+//
+// A pipeline describes how data flows from sources to destinations
+// through a series of steps. Steps form a DAG: each step declares its
+// inputs (source refs or previous step outputs) and produces a named
+// output. "send" steps write data to a destination.
+
+// --- Connection: a data source or destination ---
+
+export type ConnectionRole = "source" | "destination" | "both";
+
+export interface ConnectionEntry {
+  id: string;
+  label: string;
+  role: ConnectionRole;
+  contract: SourceContract | DataContract | null;
+  selectedSchemaIndices: number[];
 }
 
-// Data flow step types for multi-step ingestion
-//
-// Steps are equal peers in an ordered list. Each step takes input from a
-// source schema or a previous step's output, and produces output that
-// downstream steps can reference.
+// --- Step types ---
 
-export type DataFlowStepType = "mapping" | "manual_label" | "llm_classify" | "lookup" | "capture_response";
+export type PipelineStepType =
+  | "map"       // Transform fields from input schema to output schema
+  | "send"      // Write data to a destination (API call, DB insert)
+  | "label"     // Pause for human labeling of a field
+  | "classify"  // LLM-powered field classification
+  | "lookup"    // Enrich from a reference source
+  | "filter"    // Remove rows based on a condition
+  | "merge";    // Combine multiple inputs into one dataset
 
-export interface MappingStepConfig {
+// --- Step configs ---
+
+export interface MapConfig {
   field_mappings: FieldMapping[];
 }
 
-export interface ManualLabelConfig {
+export interface SendConfig {
+  destination_ref: string;
+  method?: string;
+  capture_response?: string[];
+}
+
+export interface LabelConfig {
   field: string;
   options: string[];
   instructions: string;
   allow_custom: boolean;
 }
 
-export interface LLMClassifyConfig {
+export interface ClassifyConfig {
   field: string;
+  output_field: string;
   categories: string[];
   prompt: string;
   model: string;
 }
 
 export interface LookupConfig {
-  source_ref: string;
+  lookup_source: string;
   key_field: string;
   value_field: string;
+  output_field: string;
 }
 
-export interface CaptureResponseConfig {
-  fields: string[];
+export interface FilterConfig {
+  condition: string;
 }
 
-export type DataFlowStep =
-  | { id: string; type: "mapping"; input_ref: string; output_ref: string; config: MappingStepConfig; notes?: string; user_created?: boolean }
-  | { id: string; type: "manual_label"; input_ref: string; output_ref: string; config: ManualLabelConfig; notes?: string; user_created?: boolean }
-  | { id: string; type: "llm_classify"; input_ref: string; output_ref: string; config: LLMClassifyConfig; notes?: string; user_created?: boolean }
-  | { id: string; type: "lookup"; input_ref: string; output_ref: string; config: LookupConfig; notes?: string; user_created?: boolean }
-  | { id: string; type: "capture_response"; input_ref: string; output_ref: string; config: CaptureResponseConfig; notes?: string; user_created?: boolean };
+export interface MergeConfig {
+  strategy: "union" | "join";
+  join_key?: string;
+}
 
-export interface MappingGroup {
-  destination_ref: string;
-  steps: DataFlowStep[];
+// --- Pipeline step (discriminated union) ---
+
+export interface FieldDef {
+  name: string;
+  data_type: string;
+}
+
+interface StepBase {
+  id: string;
+  label: string;
+  inputs: string[];
+  output: string;
+  output_schema?: FieldDef[];
   notes?: string;
+  user_created?: boolean;
 }
 
-export interface TransformContract {
-  contract_type: "transformation";
-  transformation_id: string;
-  source_refs: string[];
-  destination_refs: string[];
-  mapping_groups: MappingGroup[];
-  execution_plan: ExecutionPlan;
+export type PipelineStep =
+  | (StepBase & { type: "map"; config: MapConfig })
+  | (StepBase & { type: "send"; config: SendConfig })
+  | (StepBase & { type: "label"; config: LabelConfig })
+  | (StepBase & { type: "classify"; config: ClassifyConfig })
+  | (StepBase & { type: "lookup"; config: LookupConfig })
+  | (StepBase & { type: "filter"; config: FilterConfig })
+  | (StepBase & { type: "merge"; config: MergeConfig });
+
+// --- Pipeline contract ---
+
+export interface PipelineContract {
+  contract_type: "pipeline";
+  pipeline_id: string;
+  sources: Record<string, { contract_ref: string; description?: string }>;
+  destinations: Record<string, { contract_ref: string; description?: string }>;
+  steps: PipelineStep[];
   metadata?: Record<string, unknown>;
 }
 
@@ -164,7 +209,7 @@ export interface TransformContract {
 
 export interface VerifyResult {
   valid: boolean;
-  contract_type: string;
+  contract_type?: string;
   issues?: string[];
 }
 
